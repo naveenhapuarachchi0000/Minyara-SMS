@@ -293,7 +293,22 @@ activationForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     activationError.classList.add('hidden');
     
-    const code = document.getElementById('act-code').value.trim();
+    let code = document.getElementById('act-code').value.trim();
+    
+    // Smart routing if user pasted full URL or student QR by mistake
+    if (code.includes('student=')) {
+        const m = code.match(/[?&]student=([^&#]+)/);
+        if (m) code = decodeURIComponent(m[1]);
+    } else if (code.includes('activate=')) {
+        const m = code.match(/[?&]activate=([^&#]+)/);
+        if (m) code = decodeURIComponent(m[1]);
+    }
+
+    if (code.includes('minyara_qr_')) {
+        showQrView(code);
+        return;
+    }
+
     const p1 = document.getElementById('act-password').value;
     const p2 = document.getElementById('act-confirm-password').value;
 

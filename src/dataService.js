@@ -256,7 +256,7 @@ export const DataService = {
     async getStudents(activeOnly = false) {
         initStorage();
         try {
-            const queries = [Query.orderDesc('$createdAt')];
+            const queries = [Query.orderDesc('$createdAt'), Query.limit(5000)];
             if (activeOnly) queries.push(Query.equal('isActive', true));
             const res = await databases.listDocuments(DATABASE_ID, COLLECTIONS.STUDENTS, queries);
             if (res && res.documents && res.documents.length > 0) {
@@ -294,7 +294,7 @@ export const DataService = {
         if (match) return match;
 
         try {
-            const res = await databases.listDocuments(DATABASE_ID, COLLECTIONS.STUDENTS);
+            const res = await databases.listDocuments(DATABASE_ID, COLLECTIONS.STUDENTS, [Query.limit(5000)]);
             if (res && res.documents) {
                 match = res.documents.find(s => 
                     (s.qrCodeToken && s.qrCodeToken.toLowerCase() === clean) ||
@@ -410,7 +410,7 @@ export const DataService = {
     // --- Classes (Real-Time Database CRUD) ---
     async getClasses() {
         try {
-            const res = await databases.listDocuments(DATABASE_ID, COLLECTIONS.CLASSES);
+            const res = await databases.listDocuments(DATABASE_ID, COLLECTIONS.CLASSES, [Query.limit(5000)]);
             if (res && res.documents && res.documents.length > 0) {
                 localStorage.setItem('minyara_classes', JSON.stringify(res.documents));
                 return res.documents;
@@ -471,7 +471,7 @@ export const DataService = {
     // --- Payments (Real-Time Database CRUD) ---
     async getPayments(studentId = null) {
         try {
-            const q = [Query.orderDesc('date')];
+            const q = [Query.orderDesc('date'), Query.limit(5000)];
             if (studentId) q.push(Query.equal('studentId', studentId));
             const res = await databases.listDocuments(DATABASE_ID, COLLECTIONS.PAYMENTS, q);
             if (res && res.documents && res.documents.length > 0) {
@@ -545,7 +545,7 @@ export const DataService = {
     // --- Teachers (Real-Time Database CRUD) ---
     async getTeachers() {
         try {
-            const res = await databases.listDocuments(DATABASE_ID, COLLECTIONS.TEACHERS);
+            const res = await databases.listDocuments(DATABASE_ID, COLLECTIONS.TEACHERS, [Query.limit(5000)]);
             if (res && res.documents && res.documents.length > 0) {
                 localStorage.setItem('minyara_teachers', JSON.stringify(res.documents));
                 return res.documents;
@@ -637,7 +637,7 @@ export const DataService = {
     // --- Parents (Real-Time Database CRUD) ---
     async getParents() {
         try {
-            const res = await databases.listDocuments(DATABASE_ID, COLLECTIONS.PARENTS);
+            const res = await databases.listDocuments(DATABASE_ID, COLLECTIONS.PARENTS, [Query.limit(5000)]);
             if (res && res.documents && res.documents.length > 0) {
                 localStorage.setItem('minyara_parents', JSON.stringify(res.documents));
                 return res.documents;

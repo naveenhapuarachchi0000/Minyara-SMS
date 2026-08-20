@@ -700,13 +700,20 @@ input:checked + .slider:before {
   .print-action-btn,
   .sidebar,
   .top-header,
-  .overlay {
+  .overlay,
+  #receipt-modal .no-print {
     display: none !important;
   }
 
   #receipt-modal,
   #receipt-modal * {
     visibility: visible !important;
+  }
+
+  #receipt-modal .no-print,
+  #receipt-modal .no-print * {
+    display: none !important;
+    visibility: hidden !important;
   }
 
   #receipt-modal {
@@ -730,12 +737,17 @@ input:checked + .slider:before {
     padding: 0 !important;
   }
 
+  .official-receipt-card,
+  .official-receipt-card * {
+    border-color: #000000 !important;
+    color: #000000 !important;
+  }
+
   .official-receipt-card {
     border: 1px solid #000000 !important;
     box-shadow: none !important;
     width: 100% !important;
     max-width: 480px !important;
     margin: 0 auto !important;
-    color: #000000 !important;
   }
 }
