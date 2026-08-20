@@ -546,18 +546,23 @@ export async function renderStudentsList(openAddModal = false, showInactiveOnly 
             isActive: document.getElementById('s-isActive').checked
         };
 
-        if (id) {
-            await DataService.updateStudent(id, studentPayload);
-            alert('Student record updated successfully!');
-        } else {
-            await DataService.addStudent(studentPayload);
-            alert('New student registered successfully!');
+        try {
+            if (id) {
+                await DataService.updateStudent(id, studentPayload);
+                alert('Student record updated successfully!');
+            } else {
+                await DataService.addStudent(studentPayload);
+                alert('New student registered successfully!');
+            }
+            studentModal.classList.add('hidden');
+        } catch (e) {
+            console.error(e);
+            alert('Failed to save student: ' + e.message);
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Save Student Record';
+            renderStudentsList(false, showInactiveOnly);
         }
-
-        studentModal.classList.add('hidden');
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Save Student Record';
-        renderStudentsList(false, showInactiveOnly);
     });
 
     const attachRowEvents = () => {
@@ -782,16 +787,21 @@ export async function renderClassesManagement() {
             teacherName: document.getElementById('c-teacher').value
         };
 
-        if (cid) {
-            await DataService.updateClass(cid, payload);
-            alert('Class details updated successfully!');
-        } else {
-            await DataService.addClass(payload);
-            alert('Class created successfully!');
+        try {
+            if (cid) {
+                await DataService.updateClass(cid, payload);
+                alert('Class details updated successfully!');
+            } else {
+                await DataService.addClass(payload);
+                alert('Class created successfully!');
+            }
+            document.getElementById('class-modal').classList.add('hidden');
+        } catch (e) {
+            console.error(e);
+            alert('Failed to save class: ' + e.message);
+        } finally {
+            renderClassesManagement();
         }
-
-        document.getElementById('class-modal').classList.add('hidden');
-        renderClassesManagement();
     });
 
     document.querySelectorAll('.edit-class-btn').forEach(btn => {
@@ -825,10 +835,16 @@ export async function renderClassesManagement() {
         e.preventDefault();
         const cId = document.getElementById('enroll-class-select').value;
         const sId = document.getElementById('enroll-student-select').value;
-        await DataService.assignStudentToClass(sId, cId);
-        alert('Student assigned to class successfully!');
-        document.getElementById('enroll-modal').classList.add('hidden');
-        renderClassesManagement();
+        try {
+            await DataService.assignStudentToClass(sId, cId);
+            alert('Student assigned to class successfully!');
+            document.getElementById('enroll-modal').classList.add('hidden');
+        } catch (e) {
+            console.error(e);
+            alert('Failed to assign student: ' + e.message);
+        } finally {
+            renderClassesManagement();
+        }
     });
 
     document.querySelectorAll('.view-roster-btn').forEach(btn => {
@@ -1063,16 +1079,21 @@ export async function renderPaymentsManagement() {
             status: document.getElementById('pay-status').value
         };
 
-        if (pid) {
-            await DataService.updatePayment(pid, payload);
-            alert('Payment updated successfully!');
-        } else {
-            await DataService.addPayment(payload);
-            alert('Payment recorded successfully!');
+        try {
+            if (pid) {
+                await DataService.updatePayment(pid, payload);
+                alert('Payment updated successfully!');
+            } else {
+                await DataService.addPayment(payload);
+                alert('Payment recorded successfully!');
+            }
+            document.getElementById('payment-modal').classList.add('hidden');
+        } catch (e) {
+            console.error(e);
+            alert('Failed to record payment: ' + e.message);
+        } finally {
+            renderPaymentsManagement();
         }
-
-        document.getElementById('payment-modal').classList.add('hidden');
-        renderPaymentsManagement();
     });
 
     const attachPaymentRowEvents = () => {
@@ -1265,16 +1286,21 @@ export async function renderTeachersManagement() {
             subject: document.getElementById('t-subject').value
         };
 
-        if (tid) {
-            await DataService.updateTeacher(tid, payload);
-            alert('Teacher details updated successfully!');
-        } else {
-            await DataService.addTeacher(payload);
-            alert('Faculty member registered successfully!');
+        try {
+            if (tid) {
+                await DataService.updateTeacher(tid, payload);
+                alert('Teacher details updated successfully!');
+            } else {
+                await DataService.addTeacher(payload);
+                alert('Faculty member registered successfully!');
+            }
+            document.getElementById('teacher-modal').classList.add('hidden');
+        } catch (e) {
+            console.error(e);
+            alert('Failed to save teacher: ' + e.message);
+        } finally {
+            renderTeachersManagement();
         }
-
-        document.getElementById('teacher-modal').classList.add('hidden');
-        renderTeachersManagement();
     });
 
     document.querySelectorAll('.edit-teacher-btn').forEach(btn => {
@@ -1455,14 +1481,20 @@ export async function renderParentsManagement() {
     document.getElementById('parent-edit-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const pid = document.getElementById('form-parent-id').value;
-        await DataService.updateParent(pid, {
-            parentName: document.getElementById('p-name').value,
-            parentPhone: document.getElementById('p-phone').value,
-            pin: document.getElementById('p-pin').value
-        });
-        alert('Parent details updated successfully!');
-        document.getElementById('parent-edit-modal').classList.add('hidden');
-        renderParentsManagement();
+        try {
+            await DataService.updateParent(pid, {
+                parentName: document.getElementById('p-name').value,
+                parentPhone: document.getElementById('p-phone').value,
+                pin: document.getElementById('p-pin').value
+            });
+            alert('Parent details updated successfully!');
+            document.getElementById('parent-edit-modal').classList.add('hidden');
+        } catch (e) {
+            console.error(e);
+            alert('Failed to update parent: ' + e.message);
+        } finally {
+            renderParentsManagement();
+        }
     });
 
     document.querySelectorAll('.delete-parent-btn').forEach(btn => {
@@ -1590,18 +1622,24 @@ export async function renderSystemSettings() {
         document.getElementById('set-brand-preview').src = e.target.value;
     });
 
-    document.getElementById('settings-branding-form').addEventListener('submit', (e) => {
+    document.getElementById('settings-branding-form').addEventListener('submit', async (e) => {
         e.preventDefault();
-        const updated = DataService.saveSettings({
-            institutionName: document.getElementById('set-brand-name').value,
-            logoUrl: document.getElementById('set-brand-logo').value,
-            address: document.getElementById('set-address').value,
-            contactPhone: document.getElementById('set-phone').value
-        });
-        document.querySelectorAll('.institute-logo-preview, #app-logo, .small-logo').forEach(img => {
-            if (img) img.src = updated.logoUrl;
-        });
-        alert('System settings and branding updated successfully!');
-        renderSystemSettings();
+        try {
+            const updated = await DataService.saveSettings({
+                institutionName: document.getElementById('set-brand-name').value,
+                logoUrl: document.getElementById('set-brand-logo').value,
+                address: document.getElementById('set-address').value,
+                contactPhone: document.getElementById('set-phone').value
+            });
+            document.querySelectorAll('.institute-logo-preview, #app-logo, .small-logo').forEach(img => {
+                if (img) img.src = updated.logoUrl;
+            });
+            alert('System settings and branding updated successfully!');
+        } catch (e) {
+            console.error(e);
+            alert('Failed to update settings: ' + e.message);
+        } finally {
+            renderSystemSettings();
+        }
     });
 }
