@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Minyara SMS</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/src/style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  </head>
+  <body>
+    <div id="app">
+      <!-- Loading Overlay -->
+      <div id="loading" class="overlay flex-center">
+        <div class="spinner"></div>
+      </div>
+
+      <!-- Login View -->
+      <div id="login-view" class="view hidden">
+        <div class="login-container glass">
+          <div class="logo">
+            <!-- Customizable Logo Placeholder -->
+            <img id="app-logo" src="/vite.svg" alt="Minyara SMS Logo" />
+            <h1>Minyara SMS</h1>
+          </div>
+          
+          <div class="tabs">
+            <button class="tab-btn active" data-role="admin">Admin / Teacher</button>
+            <button class="tab-btn" data-role="parent">Parent</button>
+          </div>
+
+          <!-- Email Login Form -->
+          <form id="email-login-form" class="auth-form">
+            <div class="input-group">
+              <label for="email">Email</label>
+              <input type="email" id="email" required placeholder="Enter your email" />
+            </div>
+            <div class="input-group">
+              <label for="password">Password</label>
+              <input type="password" id="password" required placeholder="Enter your password" />
+            </div>
+            <button type="submit" class="btn primary">Login</button>
+          </form>
+
+          <!-- Parent PIN Login Form -->
+          <form id="parent-login-form" class="auth-form hidden">
+            <div class="input-group">
+              <label for="parentId">Parent ID (Phone Number)</label>
+              <input type="text" id="parentId" required placeholder="Enter your Parent ID" />
+            </div>
+            <div class="input-group">
+              <label for="pin">PIN</label>
+              <input type="password" id="pin" required placeholder="Enter your 6-digit PIN" />
+            </div>
+            <button type="submit" class="btn primary">Login as Parent</button>
+          </form>
+          
+          <div id="login-error" class="error-msg hidden"></div>
+        </div>
+      </div>
+
+      <!-- Dashboard Layout -->
+      <div id="dashboard-view" class="view hidden">
+        <aside class="sidebar glass">
+          <div class="logo">
+            <img src="/vite.svg" alt="Logo" class="small-logo" />
+            <h2>Minyara SMS</h2>
+          </div>
+          <nav id="nav-menu">
+            <!-- Nav items injected via JS based on role -->
+          </nav>
+          <div class="user-info">
+            <span id="current-user-name">User Name</span>
+            <span id="current-user-role" class="badge">Role</span>
+            <button id="logout-btn" class="btn secondary small">Logout</button>
+          </div>
+        </aside>
+        
+        <main class="main-content">
+          <header class="top-header glass">
+            <h2 id="page-title">Dashboard</h2>
+            <!-- Admin editable logo area -->
+            <div class="header-actions">
+              <button id="theme-toggle" class="btn icon-btn">🌓</button>
+            </div>
+          </header>
+          
+          <div id="content-area" class="content-area">
+            <!-- Dynamic content goes here -->
+          </div>
+        </main>
+      </div>
+
+      <!-- Public QR Code View -->
+      <div id="qr-public-view" class="view hidden">
+        <div class="public-container glass">
+          <h2>Student Record</h2>
+          <div id="public-student-details">
+            <!-- Injected via JS -->
+          </div>
+          <button id="qr-back-btn" class="btn secondary mt-4">Back to Login</button>
+        </div>
+      </div>
+
+    </div>
+    
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
