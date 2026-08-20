@@ -45,7 +45,7 @@ const sidebarBackdrop = document.getElementById('sidebar-backdrop');
 // Initialize App
 async function init() {
     // Sync Branding & Logo
-    const settings = DataService.getSettings();
+    const settings = await DataService.getSettings();
     document.querySelectorAll('#app-logo, .small-logo').forEach(img => {
         if (img) img.src = settings.logoUrl;
     });

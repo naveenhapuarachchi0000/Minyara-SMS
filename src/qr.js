@@ -6,7 +6,7 @@ export async function renderPublicQrView(token) {
     const container = document.getElementById('public-student-details');
     container.innerHTML = `<div class="flex-center" style="padding: 40px;"><div class="spinner"></div></div>`;
 
-    const settings = DataService.getSettings();
+    const settings = await DataService.getSettings();
     const student = await DataService.getStudentByQrToken(token);
 
     if (!student) {

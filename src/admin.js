@@ -12,7 +12,7 @@ export async function renderAdminDashboard(selectedTimeframe = 'monthly') {
     contentArea.innerHTML = `<div class="glass flex-center" style="padding: 40px;"><div class="spinner"></div></div>`;
 
     const analytics = await DataService.getAnalyticsData(selectedTimeframe);
-    const settings = DataService.getSettings();
+    const settings = await DataService.getSettings();
     const students = await DataService.getStudents(false);
     const payments = await DataService.getPayments();
 
@@ -1104,8 +1104,8 @@ export async function renderPaymentsManagement() {
         });
 
         document.querySelectorAll('.print-receipt-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const settings = DataService.getSettings();
+            btn.addEventListener('click', async () => {
+                const settings = await DataService.getSettings();
                 document.getElementById('receipt-print-target').innerHTML = `
                     <div class="official-receipt-card">
                         <div class="receipt-header">
@@ -1510,7 +1510,7 @@ export async function renderSystemSettings() {
     document.getElementById('page-title').textContent = "System Settings & Configuration";
     contentArea.innerHTML = `<div class="glass flex-center" style="padding: 40px;"><div class="spinner"></div></div>`;
 
-    const settings = DataService.getSettings();
+    const settings = await DataService.getSettings();
     const teachers = await DataService.getTeachers();
     const parents = await DataService.getParents();
 
