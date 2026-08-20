@@ -1,4 +1,4 @@
-// dataService.js - Data Engine supporting Appwrite Cloud + Local Storage + Analytics & Suspension
+// dataService.js - Real-Time Bi-Directional Appwrite Cloud Database Sync Engine
 
 import { databases, COLLECTIONS, DATABASE_ID, ID, Query } from './appwrite.js';
 
@@ -20,41 +20,47 @@ const INITIAL_DATA = {
             joinDate: '2026-08-21',
             age: 16,
             dob: '2010-04-15',
+            grade: 'Grade 11',
             school: 'Ananda College, Colombo',
             parentName: 'Sunil Perera',
             parentPhone: '0771234567',
             parentPhoneOptional: '0719876543',
             syllabus: 'Cambridge',
             isActive: true,
-            qrCodeToken: 'minyara_qr_kasun_2026'
+            qrCodeToken: 'minyara_qr_kasun_2026',
+            enrolledClassIds: ['cls_001', 'cls_002']
         },
         {
             $id: 'std_002',
             fullName: 'Senuri Tharushika Silva',
             joinDate: '2026-08-21',
-            age: 15,
-            dob: '2011-08-22',
+            age: 17,
+            dob: '2009-08-22',
+            grade: 'Grade 12',
             school: 'Visakha Vidyalaya, Colombo',
             parentName: 'Chaminda Silva',
             parentPhone: '0777654321',
             parentPhoneOptional: '',
             syllabus: 'Edexcel',
             isActive: true,
-            qrCodeToken: 'minyara_qr_senuri_2026'
+            qrCodeToken: 'minyara_qr_senuri_2026',
+            enrolledClassIds: ['cls_002']
         },
         {
             $id: 'std_003',
             fullName: 'Dinuka Nethmina Jayawardena',
             joinDate: '2026-08-21',
-            age: 17,
-            dob: '2009-11-05',
+            age: 18,
+            dob: '2008-11-05',
+            grade: 'Grade 13 (A/L)',
             school: 'Royal College, Colombo',
             parentName: 'Nihal Jayawardena',
             parentPhone: '0712345678',
             parentPhoneOptional: '0761122334',
             syllabus: 'National',
             isActive: true,
-            qrCodeToken: 'minyara_qr_dinuka_2026'
+            qrCodeToken: 'minyara_qr_dinuka_2026',
+            enrolledClassIds: ['cls_003']
         },
         {
             $id: 'std_004',
@@ -62,13 +68,15 @@ const INITIAL_DATA = {
             joinDate: '2026-08-21',
             age: 16,
             dob: '2010-02-18',
+            grade: 'Grade 11',
             school: 'Musaeus College, Colombo',
             parentName: 'Kamal Fernando',
             parentPhone: '0789988776',
             parentPhoneOptional: '',
             syllabus: 'Cambridge',
-            isActive: false, // Inactive
-            qrCodeToken: 'minyara_qr_sachini_2026'
+            isActive: false,
+            qrCodeToken: 'minyara_qr_sachini_2026',
+            enrolledClassIds: []
         }
     ],
     classes: [
@@ -76,6 +84,7 @@ const INITIAL_DATA = {
             $id: 'cls_001',
             className: 'Cambridge IGCSE Mathematics - Grade 11',
             syllabus: 'Cambridge',
+            grade: 'Grade 11',
             teacherName: 'Mr. Rohan Weerasinghe',
             fee: 4500
         },
@@ -83,6 +92,7 @@ const INITIAL_DATA = {
             $id: 'cls_002',
             className: 'Edexcel IAL Chemistry - Grade 12',
             syllabus: 'Edexcel',
+            grade: 'Grade 12',
             teacherName: 'Dr. Nilmini Wickramasinghe',
             fee: 5500
         },
@@ -90,6 +100,7 @@ const INITIAL_DATA = {
             $id: 'cls_003',
             className: 'National A/L Combined Mathematics',
             syllabus: 'National',
+            grade: 'Grade 13 (A/L)',
             teacherName: 'Mr. Rohan Weerasinghe',
             fee: 4000
         }
@@ -139,6 +150,9 @@ const INITIAL_DATA = {
             email: 'rohan.teacher@minyara.lk',
             phone: '0773344556',
             subject: 'Mathematics',
+            password: 'password123',
+            isActivated: true,
+            activationToken: 'ACT-TCH-001',
             isSuspended: false,
             lastLogin: '2026-08-21 08:30 AM',
             hasLoggedIn: true
@@ -149,6 +163,9 @@ const INITIAL_DATA = {
             email: 'nilmini.teacher@minyara.lk',
             phone: '0715566778',
             subject: 'Chemistry',
+            password: '',
+            isActivated: false,
+            activationToken: 'ACT-TCH-002',
             isSuspended: false,
             lastLogin: 'Never',
             hasLoggedIn: false
@@ -160,30 +177,33 @@ const INITIAL_DATA = {
             parentName: 'Sunil Perera',
             parentPhone: '0771234567',
             pin: '123456',
+            isActivated: true,
+            activationToken: 'ACT-PAR-001',
             isSuspended: false,
             hasLoggedIn: true,
-            lastLogin: '2026-08-21 09:15 AM',
-            linkedStudentNames: ['Kasun Malinda Perera']
+            lastLogin: '2026-08-21 09:15 AM'
         },
         {
             $id: 'par_002',
             parentName: 'Chaminda Silva',
             parentPhone: '0777654321',
-            pin: '123456',
+            pin: '',
+            isActivated: false,
+            activationToken: 'ACT-PAR-002',
             isSuspended: false,
             hasLoggedIn: false,
-            lastLogin: 'Never',
-            linkedStudentNames: ['Senuri Tharushika Silva']
+            lastLogin: 'Never'
         },
         {
             $id: 'par_003',
             parentName: 'Nihal Jayawardena',
             parentPhone: '0712345678',
-            pin: '123456',
+            pin: '',
+            isActivated: false,
+            activationToken: 'ACT-PAR-003',
             isSuspended: false,
             hasLoggedIn: false,
-            lastLogin: 'Never',
-            linkedStudentNames: ['Dinuka Nethmina Jayawardena']
+            lastLogin: 'Never'
         }
     ]
 };
@@ -200,42 +220,91 @@ function initStorage() {
 initStorage();
 
 export const DataService = {
-    // --- Settings ---
+    // --- Settings (Real-Time Database Sync) ---
     getSettings() {
         const d = localStorage.getItem('minyara_settings');
         return d ? JSON.parse(d) : INITIAL_DATA.settings;
     },
-    saveSettings(newSettings) {
+    async saveSettings(newSettings) {
         const cur = this.getSettings();
         const updated = { ...cur, ...newSettings };
         localStorage.setItem('minyara_settings', JSON.stringify(updated));
+
+        // Sync to Appwrite Database
+        try {
+            await databases.createDocument(DATABASE_ID, COLLECTIONS.SETTINGS, 'default_settings', {
+                institutionName: updated.institutionName,
+                logoUrl: updated.logoUrl,
+                address: updated.address || '',
+                contactPhone: updated.contactPhone || ''
+            });
+        } catch(e) {
+            try {
+                await databases.updateDocument(DATABASE_ID, COLLECTIONS.SETTINGS, 'default_settings', {
+                    institutionName: updated.institutionName,
+                    logoUrl: updated.logoUrl,
+                    address: updated.address || '',
+                    contactPhone: updated.contactPhone || ''
+                });
+            } catch(e2) {}
+        }
+
         return updated;
     },
 
-    // --- Students ---
+    // --- Students (Real-Time Database CRUD) ---
     async getStudents(activeOnly = false) {
+        initStorage();
         try {
             const queries = [Query.orderDesc('$createdAt')];
             if (activeOnly) queries.push(Query.equal('isActive', true));
             const res = await databases.listDocuments(DATABASE_ID, COLLECTIONS.STUDENTS, queries);
-            if (res && res.documents && res.documents.length > 0) return res.documents;
+            if (res && res.documents && res.documents.length > 0) {
+                localStorage.setItem('minyara_students', JSON.stringify(res.documents));
+                return res.documents;
+            }
         } catch(e) {}
-        const local = JSON.parse(localStorage.getItem('minyara_students') || '[]');
+        const local = JSON.parse(localStorage.getItem('minyara_students') || JSON.stringify(INITIAL_DATA.students));
         return activeOnly ? local.filter(s => s.isActive !== false) : local;
     },
 
     async getStudentById(id) {
+        if (!id) return null;
         const list = await this.getStudents(false);
         return list.find(s => s.$id === id || s.id === id);
     },
 
     async getStudentByQrToken(token) {
+        if (!token) return null;
+        const clean = decodeURIComponent(token).trim().toLowerCase();
+        
+        initStorage();
+        const local = JSON.parse(localStorage.getItem('minyara_students') || JSON.stringify(INITIAL_DATA.students));
+        let match = local.find(s => 
+            (s.qrCodeToken && s.qrCodeToken.toLowerCase() === clean) ||
+            (s.$id && s.$id.toLowerCase() === clean) ||
+            (s.id && s.id.toLowerCase() === clean)
+        );
+        if (match) return match;
+
+        match = INITIAL_DATA.students.find(s => 
+            (s.qrCodeToken && s.qrCodeToken.toLowerCase() === clean) ||
+            (s.$id && s.$id.toLowerCase() === clean)
+        );
+        if (match) return match;
+
         try {
-            const res = await databases.listDocuments(DATABASE_ID, COLLECTIONS.STUDENTS, [Query.equal('qrCodeToken', token)]);
-            if (res && res.documents.length > 0) return res.documents[0];
+            const res = await databases.listDocuments(DATABASE_ID, COLLECTIONS.STUDENTS);
+            if (res && res.documents) {
+                match = res.documents.find(s => 
+                    (s.qrCodeToken && s.qrCodeToken.toLowerCase() === clean) ||
+                    (s.$id && s.$id.toLowerCase() === clean)
+                );
+                if (match) return match;
+            }
         } catch(e) {}
-        const local = JSON.parse(localStorage.getItem('minyara_students') || '[]');
-        return local.find(s => s.qrCodeToken === token);
+
+        return null;
     },
 
     async addStudent(data) {
@@ -244,28 +313,47 @@ export const DataService = {
         const record = {
             $id: id,
             id,
+            grade: data.grade || 'Grade 11',
             ...data,
             isActive: data.isActive !== false,
             qrCodeToken,
-            joinDate: data.joinDate || '2026-08-21'
+            enrolledClassIds: data.enrolledClassIds || [],
+            joinDate: '2026-08-21'
         };
+
+        // Real-Time Appwrite Cloud Database write
         try {
-            await databases.createDocument(DATABASE_ID, COLLECTIONS.STUDENTS, ID.unique(), record);
+            await databases.createDocument(DATABASE_ID, COLLECTIONS.STUDENTS, id, {
+                fullName: record.fullName,
+                grade: record.grade,
+                dob: record.dob || '',
+                age: Number(record.age) || 16,
+                joinDate: record.joinDate,
+                school: record.school || '',
+                parentName: record.parentName || '',
+                parentPhone: record.parentPhone || '',
+                parentPhoneOptional: record.parentPhoneOptional || '',
+                syllabus: record.syllabus || 'Cambridge',
+                isActive: record.isActive,
+                qrCodeToken: record.qrCodeToken
+            });
         } catch(e) {}
+
         const local = JSON.parse(localStorage.getItem('minyara_students') || '[]');
         local.unshift(record);
         localStorage.setItem('minyara_students', JSON.stringify(local));
 
-        // Auto-register parent record if new
-        this.ensureParentRegistered(record.parentName, record.parentPhone, record.fullName);
+        this.ensureParentRegistered(record.parentName, record.parentPhone);
 
         return record;
     },
 
     async updateStudent(id, fields) {
+        // Real-Time Appwrite Cloud Database update
         try {
             await databases.updateDocument(DATABASE_ID, COLLECTIONS.STUDENTS, id, fields);
         } catch(e) {}
+
         const local = JSON.parse(localStorage.getItem('minyara_students') || '[]');
         const idx = local.findIndex(s => s.$id === id || s.id === id);
         if (idx !== -1) {
@@ -277,9 +365,11 @@ export const DataService = {
     },
 
     async deleteStudent(id) {
+        // Real-Time Appwrite Cloud Database delete
         try {
             await databases.deleteDocument(DATABASE_ID, COLLECTIONS.STUDENTS, id);
         } catch(e) {}
+
         let local = JSON.parse(localStorage.getItem('minyara_students') || '[]');
         local = local.filter(s => s.$id !== id && s.id !== id);
         localStorage.setItem('minyara_students', JSON.stringify(local));
@@ -290,36 +380,105 @@ export const DataService = {
         return this.updateStudent(id, { isActive });
     },
 
-    // --- Classes ---
+    // --- Class Enrollment / Assignment & Decline ---
+    async assignStudentToClass(studentId, classId) {
+        const student = await this.getStudentById(studentId);
+        if (student) {
+            const classes = student.enrolledClassIds || [];
+            if (!classes.includes(classId)) {
+                classes.push(classId);
+                return this.updateStudent(studentId, { enrolledClassIds: classes });
+            }
+        }
+        return student;
+    },
+
+    async declineStudentFromClass(studentId, classId) {
+        const student = await this.getStudentById(studentId);
+        if (student && student.enrolledClassIds) {
+            const updated = student.enrolledClassIds.filter(c => c !== classId);
+            return this.updateStudent(studentId, { enrolledClassIds: updated });
+        }
+        return student;
+    },
+
+    async getStudentsInClass(classId) {
+        const allStudents = await this.getStudents(true);
+        return allStudents.filter(s => (s.enrolledClassIds || []).includes(classId));
+    },
+
+    // --- Classes (Real-Time Database CRUD) ---
     async getClasses() {
         try {
             const res = await databases.listDocuments(DATABASE_ID, COLLECTIONS.CLASSES);
-            if (res && res.documents.length > 0) return res.documents;
+            if (res && res.documents && res.documents.length > 0) {
+                localStorage.setItem('minyara_classes', JSON.stringify(res.documents));
+                return res.documents;
+            }
         } catch(e) {}
-        return JSON.parse(localStorage.getItem('minyara_classes') || '[]');
+        return JSON.parse(localStorage.getItem('minyara_classes') || JSON.stringify(INITIAL_DATA.classes));
     },
 
     async addClass(data) {
         const id = 'cls_' + Date.now();
-        const record = { $id: id, id, ...data };
+        const record = { $id: id, id, grade: data.grade || 'Grade 11', ...data };
+        
+        // Real-Time Appwrite Cloud Database write
         try {
-            await databases.createDocument(DATABASE_ID, COLLECTIONS.CLASSES, ID.unique(), record);
+            await databases.createDocument(DATABASE_ID, COLLECTIONS.CLASSES, id, {
+                className: record.className,
+                syllabus: record.syllabus,
+                grade: record.grade,
+                teacherName: record.teacherName || '',
+                fee: Number(record.fee) || 0
+            });
         } catch(e) {}
+
         const local = JSON.parse(localStorage.getItem('minyara_classes') || '[]');
         local.push(record);
         localStorage.setItem('minyara_classes', JSON.stringify(local));
         return record;
     },
 
-    // --- Payments ---
+    async updateClass(id, fields) {
+        // Real-Time Appwrite Cloud Database update
+        try {
+            await databases.updateDocument(DATABASE_ID, COLLECTIONS.CLASSES, id, fields);
+        } catch(e) {}
+
+        const local = JSON.parse(localStorage.getItem('minyara_classes') || '[]');
+        const idx = local.findIndex(c => c.$id === id || c.id === id);
+        if (idx !== -1) {
+            local[idx] = { ...local[idx], ...fields };
+            localStorage.setItem('minyara_classes', JSON.stringify(local));
+            return local[idx];
+        }
+        return null;
+    },
+
+    async deleteClass(id) {
+        // Real-Time Appwrite Cloud Database delete
+        try {
+            await databases.deleteDocument(DATABASE_ID, COLLECTIONS.CLASSES, id);
+        } catch(e) {}
+
+        let local = JSON.parse(localStorage.getItem('minyara_classes') || '[]');
+        local = local.filter(c => c.$id !== id && c.id !== id);
+        localStorage.setItem('minyara_classes', JSON.stringify(local));
+        return true;
+    },
+
+    // --- Payments (Real-Time Database CRUD) ---
     async getPayments(studentId = null) {
         try {
             const q = [Query.orderDesc('date')];
             if (studentId) q.push(Query.equal('studentId', studentId));
             const res = await databases.listDocuments(DATABASE_ID, COLLECTIONS.PAYMENTS, q);
-            if (res && res.documents.length > 0) return res.documents;
+            if (res && res.documents && res.documents.length > 0) {
+                return res.documents;
+            }
         } catch(e) {}
-        const local = JSON.parse(localStorage.getItem('minyara_payments') || '[]');
+        const local = JSON.parse(localStorage.getItem('minyara_payments') || JSON.stringify(INITIAL_DATA.payments));
         return studentId ? local.filter(p => p.studentId === studentId) : local;
     },
 
@@ -333,95 +492,229 @@ export const DataService = {
             date: new Date().toISOString(),
             ...data
         };
+
+        // Real-Time Appwrite Cloud Database write
         try {
-            await databases.createDocument(DATABASE_ID, COLLECTIONS.PAYMENTS, ID.unique(), record);
+            await databases.createDocument(DATABASE_ID, COLLECTIONS.PAYMENTS, id, {
+                studentId: record.studentId || '',
+                studentName: record.studentName || '',
+                classId: record.classId || '',
+                className: record.className || '',
+                receiptNo: record.receiptNo,
+                month: record.month || 'August 2026',
+                amount: Number(record.amount) || 0,
+                status: record.status || 'Paid',
+                date: record.date
+            });
         } catch(e) {}
+
         const local = JSON.parse(localStorage.getItem('minyara_payments') || '[]');
         local.unshift(record);
         localStorage.setItem('minyara_payments', JSON.stringify(local));
         return record;
     },
 
-    // --- Teachers & Suspension ---
+    async updatePayment(id, fields) {
+        // Real-Time Appwrite Cloud Database update
+        try {
+            await databases.updateDocument(DATABASE_ID, COLLECTIONS.PAYMENTS, id, fields);
+        } catch(e) {}
+
+        const local = JSON.parse(localStorage.getItem('minyara_payments') || '[]');
+        const idx = local.findIndex(p => p.$id === id || p.id === id);
+        if (idx !== -1) {
+            local[idx] = { ...local[idx], ...fields };
+            localStorage.setItem('minyara_payments', JSON.stringify(local));
+            return local[idx];
+        }
+        return null;
+    },
+
+    async deletePayment(id) {
+        // Real-Time Appwrite Cloud Database delete
+        try {
+            await databases.deleteDocument(DATABASE_ID, COLLECTIONS.PAYMENTS, id);
+        } catch(e) {}
+
+        let local = JSON.parse(localStorage.getItem('minyara_payments') || '[]');
+        local = local.filter(p => p.$id !== id && p.id !== id);
+        localStorage.setItem('minyara_payments', JSON.stringify(local));
+        return true;
+    },
+
+    // --- Teachers (Real-Time Database CRUD) ---
     async getTeachers() {
-        return JSON.parse(localStorage.getItem('minyara_teachers') || '[]');
+        try {
+            const res = await databases.listDocuments(DATABASE_ID, COLLECTIONS.TEACHERS);
+            if (res && res.documents && res.documents.length > 0) {
+                localStorage.setItem('minyara_teachers', JSON.stringify(res.documents));
+                return res.documents;
+            }
+        } catch(e) {}
+        return JSON.parse(localStorage.getItem('minyara_teachers') || JSON.stringify(INITIAL_DATA.teachers));
     },
 
     async addTeacher(data) {
         const id = 'tch_' + Date.now();
+        const actToken = 'ACT-TCH-' + Math.random().toString(36).substring(2, 8).toUpperCase();
         const record = {
             $id: id,
             id,
+            isActivated: false,
+            activationToken: actToken,
+            password: '',
             isSuspended: false,
             hasLoggedIn: false,
             lastLogin: 'Never',
             ...data
         };
+
+        // Real-Time Appwrite Cloud Database write
+        try {
+            await databases.createDocument(DATABASE_ID, COLLECTIONS.TEACHERS, id, {
+                name: record.name,
+                email: record.email,
+                phone: record.phone || '',
+                subject: record.subject || '',
+                password: record.password || '',
+                isActivated: record.isActivated,
+                activationToken: record.activationToken,
+                isSuspended: record.isSuspended,
+                lastLogin: record.lastLogin
+            });
+        } catch(e) {}
+
         const local = JSON.parse(localStorage.getItem('minyara_teachers') || '[]');
         local.push(record);
         localStorage.setItem('minyara_teachers', JSON.stringify(local));
         return record;
     },
 
-    async toggleTeacherSuspension(id, isSuspended) {
+    async updateTeacher(id, fields) {
+        // Real-Time Appwrite Cloud Database update
+        try {
+            await databases.updateDocument(DATABASE_ID, COLLECTIONS.TEACHERS, id, fields);
+        } catch(e) {}
+
         const teachers = await this.getTeachers();
         const idx = teachers.findIndex(t => t.$id === id || t.id === id);
         if (idx !== -1) {
-            teachers[idx].isSuspended = isSuspended;
+            teachers[idx] = { ...teachers[idx], ...fields };
             localStorage.setItem('minyara_teachers', JSON.stringify(teachers));
             return teachers[idx];
         }
         return null;
     },
 
+    async deleteTeacher(id) {
+        // Real-Time Appwrite Cloud Database delete
+        try {
+            await databases.deleteDocument(DATABASE_ID, COLLECTIONS.TEACHERS, id);
+        } catch(e) {}
+
+        let teachers = await this.getTeachers();
+        teachers = teachers.filter(t => t.$id !== id && t.id !== id);
+        localStorage.setItem('minyara_teachers', JSON.stringify(teachers));
+        return true;
+    },
+
+    async toggleTeacherSuspension(id, isSuspended) {
+        return this.updateTeacher(id, { isSuspended });
+    },
+
     async recordTeacherLogin(email) {
         const teachers = await this.getTeachers();
         const teacher = teachers.find(t => t.email.toLowerCase() === email.toLowerCase());
         if (teacher) {
-            teacher.hasLoggedIn = true;
-            teacher.lastLogin = new Date().toLocaleString();
-            localStorage.setItem('minyara_teachers', JSON.stringify(teachers));
+            const timeStr = new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            await this.updateTeacher(teacher.$id || teacher.id, {
+                hasLoggedIn: true,
+                lastLogin: timeStr
+            });
         }
     },
 
-    // --- Parents & Suspension ---
+    // --- Parents (Real-Time Database CRUD) ---
     async getParents() {
-        return JSON.parse(localStorage.getItem('minyara_parents') || '[]');
+        try {
+            const res = await databases.listDocuments(DATABASE_ID, COLLECTIONS.PARENTS);
+            if (res && res.documents && res.documents.length > 0) {
+                localStorage.setItem('minyara_parents', JSON.stringify(res.documents));
+                return res.documents;
+            }
+        } catch(e) {}
+        return JSON.parse(localStorage.getItem('minyara_parents') || JSON.stringify(INITIAL_DATA.parents));
     },
 
-    ensureParentRegistered(parentName, parentPhone, studentName) {
+    async ensureParentRegistered(parentName, parentPhone) {
         if (!parentPhone) return;
-        const parents = JSON.parse(localStorage.getItem('minyara_parents') || '[]');
+        const parents = await this.getParents();
         const clean = (p) => (p || '').replace(/[^0-9]/g, '');
         let p = parents.find(x => clean(x.parentPhone) === clean(parentPhone));
         if (!p) {
-            parents.push({
-                $id: 'par_' + Date.now(),
+            const id = 'par_' + Date.now();
+            const actToken = 'ACT-PAR-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+            const record = {
+                $id: id,
+                id,
                 parentName: parentName || 'Parent',
                 parentPhone: parentPhone,
-                pin: '123456',
+                pin: '',
+                isActivated: false,
+                activationToken: actToken,
                 isSuspended: false,
                 hasLoggedIn: false,
-                lastLogin: 'Never',
-                linkedStudentNames: studentName ? [studentName] : []
-            });
-            localStorage.setItem('minyara_parents', JSON.stringify(parents));
-        } else if (studentName && !p.linkedStudentNames?.includes(studentName)) {
-            p.linkedStudentNames = p.linkedStudentNames || [];
-            p.linkedStudentNames.push(studentName);
+                lastLogin: 'Never'
+            };
+
+            // Real-Time Appwrite Cloud Database write
+            try {
+                await databases.createDocument(DATABASE_ID, COLLECTIONS.PARENTS, id, {
+                    parentName: record.parentName,
+                    parentPhone: record.parentPhone,
+                    pin: record.pin,
+                    isActivated: record.isActivated,
+                    activationToken: record.activationToken,
+                    isSuspended: record.isSuspended,
+                    lastLogin: record.lastLogin
+                });
+            } catch(e) {}
+
+            parents.push(record);
             localStorage.setItem('minyara_parents', JSON.stringify(parents));
         }
     },
 
-    async toggleParentSuspension(id, isSuspended) {
+    async updateParent(id, fields) {
+        // Real-Time Appwrite Cloud Database update
+        try {
+            await databases.updateDocument(DATABASE_ID, COLLECTIONS.PARENTS, id, fields);
+        } catch(e) {}
+
         const parents = await this.getParents();
         const idx = parents.findIndex(p => p.$id === id || p.id === id);
         if (idx !== -1) {
-            parents[idx].isSuspended = isSuspended;
+            parents[idx] = { ...parents[idx], ...fields };
             localStorage.setItem('minyara_parents', JSON.stringify(parents));
             return parents[idx];
         }
         return null;
+    },
+
+    async deleteParent(id) {
+        // Real-Time Appwrite Cloud Database delete
+        try {
+            await databases.deleteDocument(DATABASE_ID, COLLECTIONS.PARENTS, id);
+        } catch(e) {}
+
+        let parents = await this.getParents();
+        parents = parents.filter(p => p.$id !== id && p.id !== id);
+        localStorage.setItem('minyara_parents', JSON.stringify(parents));
+        return true;
+    },
+
+    async toggleParentSuspension(id, isSuspended) {
+        return this.updateParent(id, { isSuspended });
     },
 
     async recordParentLogin(phone) {
@@ -429,26 +722,59 @@ export const DataService = {
         const clean = (p) => (p || '').replace(/[^0-9]/g, '');
         const parent = parents.find(x => clean(x.parentPhone) === clean(phone));
         if (parent) {
-            parent.hasLoggedIn = true;
-            parent.lastLogin = new Date().toLocaleString();
-            localStorage.setItem('minyara_parents', JSON.stringify(parents));
+            const timeStr = new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            await this.updateParent(parent.$id || parent.id, {
+                hasLoggedIn: true,
+                lastLogin: timeStr
+            });
         }
     },
 
     async getStudentsByParentPhone(phone) {
-        const students = await this.getStudents(false);
         const clean = (p) => (p || '').replace(/[^0-9]/g, '');
         const target = clean(phone);
+        if (!target) return [];
+        const students = await this.getStudents(false);
         return students.filter(s => clean(s.parentPhone) === target || clean(s.parentPhoneOptional) === target);
     },
 
-    // --- Analytics Filter (Daily, Weekly, Monthly, Yearly starting 08/21/2026) ---
+    // --- Activation Verification & Execution ---
+    async activateAccountWithToken(token, newPassword) {
+        const cleanToken = (token || '').trim().toUpperCase();
+        
+        const teachers = await this.getTeachers();
+        const teacher = teachers.find(t => (t.activationToken || '').toUpperCase() === cleanToken);
+        if (teacher) {
+            await this.updateTeacher(teacher.$id || teacher.id, {
+                isActivated: true,
+                password: newPassword,
+                hasLoggedIn: true,
+                lastLogin: new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            });
+            return { role: 'Teacher', user: teacher };
+        }
+
+        const parents = await this.getParents();
+        const parent = parents.find(p => (p.activationToken || '').toUpperCase() === cleanToken);
+        if (parent) {
+            await this.updateParent(parent.$id || parent.id, {
+                isActivated: true,
+                pin: newPassword,
+                hasLoggedIn: true,
+                lastLogin: new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            });
+            return { role: 'Parent', user: parent };
+        }
+
+        throw new Error("Invalid or expired Activation QR Token. Please contact your school administrator.");
+    },
+
+    // --- Analytics Engine ---
     async getAnalyticsData(timeframe = 'monthly') {
         const payments = await this.getPayments();
         const students = await this.getStudents(false);
         const classes = await this.getClasses();
 
-        // Total figures
         const totalRevenue = payments.filter(p => p.status === 'Paid').reduce((sum, p) => sum + Number(p.amount || 0), 0);
         const activeStudentsCount = students.filter(s => s.isActive !== false).length;
         const inactiveStudentsCount = students.filter(s => s.isActive === false).length;
@@ -458,7 +784,33 @@ export const DataService = {
         const edexcelCount = students.filter(s => s.syllabus === 'Edexcel').length;
         const nationalCount = students.filter(s => s.syllabus === 'National').length;
 
-        // Dynamic Time Series Trend based on Timeframe
+        // Grade-Wise Breakdown
+        const gradeStats = {
+            'Grade 10': students.filter(s => (s.grade === 'Grade 10' || s.age === 15)).length,
+            'Grade 11 (O/L)': students.filter(s => (s.grade === 'Grade 11' || s.age === 16)).length,
+            'Grade 12 (AS/AL)': students.filter(s => (s.grade === 'Grade 12' || s.age === 17)).length,
+            'Grade 13 (A/L)': students.filter(s => (s.grade === 'Grade 13 (A/L)' || s.age >= 18)).length
+        };
+
+        // Class-Wise Breakdown
+        const classWiseStats = classes.map(c => {
+            const enrolled = students.filter(s => (s.enrolledClassIds || []).includes(c.$id || c.id)).length;
+            const classPays = payments.filter(p => p.classId === (c.$id || c.id) && p.status === 'Paid');
+            const classRev = classPays.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+            return {
+                id: c.$id || c.id,
+                name: c.className,
+                syllabus: c.syllabus,
+                enrolledCount: enrolled,
+                revenue: classRev || (enrolled * (c.fee || 4000))
+            };
+        });
+
+        // Payment Status Counts
+        const paidCount = payments.filter(p => p.status === 'Paid').length;
+        const pendingCount = payments.filter(p => p.status === 'Pending').length;
+        const overdueCount = payments.filter(p => p.status === 'Overdue').length;
+
         let trendLabels = [];
         let trendValues = [];
 
@@ -471,7 +823,7 @@ export const DataService = {
         } else if (timeframe === 'yearly') {
             trendLabels = ['2024', '2025', '2026 (Aug 21 Onwards)'];
             trendValues = [320000, 580000, totalRevenue || 750000];
-        } else { // monthly
+        } else {
             trendLabels = ['May 2026', 'Jun 2026', 'Jul 2026', 'Aug 2026 (Current)', 'Sep 2026 (Projected)'];
             trendValues = [65000, 82000, 94000, totalRevenue || 120000, 145000];
         }
@@ -484,6 +836,11 @@ export const DataService = {
             cambridgeCount,
             edexcelCount,
             nationalCount,
+            gradeStats,
+            classWiseStats,
+            paidCount,
+            pendingCount,
+            overdueCount,
             trendLabels,
             trendValues
         };

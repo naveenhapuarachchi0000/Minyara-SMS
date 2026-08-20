@@ -1,4 +1,4 @@
-// main.js - Central Controller, Authentication, Suspension Guard & Navigation
+// main.js - Central Application Engine with Mobile Drawer, QR Activation Flow, & Activity Sync
 
 import { account } from './appwrite.js';
 import { DataService } from './dataService.js';
@@ -19,19 +19,28 @@ let currentUser = null;
 
 // DOM Elements
 const loginView = document.getElementById('login-view');
+const activationView = document.getElementById('activation-view');
 const dashboardView = document.getElementById('dashboard-view');
 const qrPublicView = document.getElementById('qr-public-view');
 
 const emailLoginForm = document.getElementById('email-login-form');
 const parentLoginForm = document.getElementById('parent-login-form');
+const activationForm = document.getElementById('activation-form');
 const tabBtns = document.querySelectorAll('.tab-btn');
 const loginError = document.getElementById('login-error');
+const activationError = document.getElementById('activation-error');
 
 const currentUserName = document.getElementById('current-user-name');
 const currentUserRole = document.getElementById('current-user-role');
 const navMenu = document.getElementById('nav-menu');
 const logoutBtn = document.getElementById('logout-btn');
 const themeToggle = document.getElementById('theme-toggle');
+
+// Mobile Navigation Elements
+const appSidebar = document.getElementById('app-sidebar');
+const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+const sidebarCloseBtn = document.getElementById('sidebar-close-btn');
+const sidebarBackdrop = document.getElementById('sidebar-backdrop');
 
 // Initialize App
 async function init() {
@@ -41,12 +50,32 @@ async function init() {
         if (img) img.src = settings.logoUrl;
     });
 
-    // Check URL parameters for QR scan view
-    const urlParams = new URLSearchParams(window.location.search);
-    const qrToken = urlParams.get('student');
+    // Robust URL parameters parsing for mobile camera QR scanners
+    let qrToken = null;
+    let actToken = null;
+
+    try {
+        const urlParams = new URLSearchParams(window.location.search || (window.location.hash.includes('?') ? window.location.hash.split('?')[1] : ''));
+        qrToken = urlParams.get('student');
+        actToken = urlParams.get('activate');
+        
+        if (!qrToken && window.location.href.includes('student=')) {
+            const m = window.location.href.match(/[?&]student=([^&#]+)/);
+            if (m) qrToken = decodeURIComponent(m[1]);
+        }
+        if (!actToken && window.location.href.includes('activate=')) {
+            const m = window.location.href.match(/[?&]activate=([^&#]+)/);
+            if (m) actToken = decodeURIComponent(m[1]);
+        }
+    } catch(e) {}
     
     if (qrToken) {
         showQrView(qrToken);
+        return;
+    }
+
+    if (actToken) {
+        showActivationView(actToken);
         return;
     }
 
@@ -73,13 +102,27 @@ async function init() {
 // UI State Management
 function showLoginView() {
     loginView.classList.remove('hidden');
+    activationView.classList.add('hidden');
     dashboardView.classList.add('hidden');
     qrPublicView.classList.add('hidden');
     document.getElementById('loading').classList.add('hidden');
+    closeMobileSidebar();
+}
+
+function showActivationView(token = '') {
+    activationView.classList.remove('hidden');
+    loginView.classList.add('hidden');
+    dashboardView.classList.add('hidden');
+    qrPublicView.classList.add('hidden');
+    document.getElementById('loading').classList.add('hidden');
+    if (token) {
+        document.getElementById('act-code').value = token;
+    }
 }
 
 function showDashboardView() {
     loginView.classList.add('hidden');
+    activationView.classList.add('hidden');
     dashboardView.classList.remove('hidden');
     qrPublicView.classList.add('hidden');
     document.getElementById('loading').classList.add('hidden');
@@ -89,6 +132,7 @@ async function showQrView(token) {
     document.getElementById('loading').classList.remove('hidden');
     qrPublicView.classList.remove('hidden');
     loginView.classList.add('hidden');
+    activationView.classList.add('hidden');
     dashboardView.classList.add('hidden');
     
     await renderPublicQrView(token);
@@ -102,6 +146,21 @@ document.getElementById('qr-back-btn').addEventListener('click', () => {
     window.history.pushState({}, '', url);
     showLoginView();
 });
+
+// Mobile Sidebar Controls
+function openMobileSidebar() {
+    if (appSidebar) appSidebar.classList.add('open');
+    if (sidebarBackdrop) sidebarBackdrop.classList.remove('hidden');
+}
+
+function closeMobileSidebar() {
+    if (appSidebar) appSidebar.classList.remove('open');
+    if (sidebarBackdrop) sidebarBackdrop.classList.add('hidden');
+}
+
+if (mobileMenuBtn) mobileMenuBtn.addEventListener('click', openMobileSidebar);
+if (sidebarCloseBtn) sidebarCloseBtn.addEventListener('click', closeMobileSidebar);
+if (sidebarBackdrop) sidebarBackdrop.addEventListener('click', closeMobileSidebar);
 
 // Login Tabs Switching
 tabBtns.forEach(btn => {
@@ -121,7 +180,16 @@ tabBtns.forEach(btn => {
     });
 });
 
-// Admin / Teacher Email Login with Suspension Verification
+document.getElementById('open-activation-btn').addEventListener('click', (e) => {
+    e.preventDefault();
+    showActivationView();
+});
+
+document.getElementById('act-back-login-btn').addEventListener('click', () => {
+    showLoginView();
+});
+
+// Admin / Teacher Email Login with First-Time QR Activation & Suspension Guard
 emailLoginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     loginError.classList.add('hidden');
@@ -131,13 +199,23 @@ emailLoginForm.addEventListener('submit', async (e) => {
     const password = document.getElementById('password').value.trim();
 
     try {
-        // Check Teacher Suspension
         if (email.includes('teacher') || email.includes('faculty')) {
             const teachers = await DataService.getTeachers();
             const t = teachers.find(x => x.email.toLowerCase() === email.toLowerCase());
-            if (t && t.isSuspended) {
-                throw new Error("⛔ Account Suspended: Your teacher account has been suspended by administration.");
+
+            if (t) {
+                if (t.isSuspended) {
+                    throw new Error("⛔ Account Suspended: Your teacher account has been suspended by administration.");
+                }
+                // Check if activated via QR
+                if (t.isActivated === false) {
+                    throw new Error("⚠️ First-Time Setup Required: Please scan your onboarding QR code first to set your password and activate your account.");
+                }
+                if (t.password && t.password !== password) {
+                    throw new Error("Incorrect password. Please verify your password.");
+                }
             }
+
             await DataService.recordTeacherLogin(email);
             currentUser = { name: t ? t.name : email.split('@')[0], email, role: 'Teacher' };
         } else if (email === 'naveenhapuarachchi1111@gmail.com' && password === '123234455') {
@@ -145,7 +223,6 @@ emailLoginForm.addEventListener('submit', async (e) => {
         } else if (email === 'admin@minyara.lk' || email === 'admin@gmail.com') {
             currentUser = { name: 'System Administrator', email, role: 'Admin' };
         } else {
-            // Attempt Appwrite Authentication
             try {
                 await account.createEmailPasswordSession(email, password);
                 currentUser = await account.get();
@@ -163,7 +240,7 @@ emailLoginForm.addEventListener('submit', async (e) => {
     }
 });
 
-// Parent Phone + PIN Login with Suspension Verification
+// Parent Phone + PIN Login with First-Time QR Activation & Suspension Guard
 parentLoginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     loginError.classList.add('hidden');
@@ -181,8 +258,17 @@ parentLoginForm.addEventListener('submit', async (e) => {
         const clean = (p) => (p || '').replace(/[^0-9]/g, '');
         const p = parents.find(x => clean(x.parentPhone) === clean(parentId));
 
-        if (p && p.isSuspended) {
-            throw new Error("⛔ Access Denied: Your parent account has been suspended by administration.");
+        if (p) {
+            if (p.isSuspended) {
+                throw new Error("⛔ Access Denied: Your parent account has been suspended by administration.");
+            }
+            // Check if activated via QR
+            if (p.isActivated === false) {
+                throw new Error("⚠️ First-Time Setup Required: Please scan your onboarding QR code first to create your security PIN and activate your portal.");
+            }
+            if (p.pin && p.pin !== pin) {
+                throw new Error("Incorrect PIN. Please verify your 4-6 digit PIN.");
+            }
         }
 
         await DataService.recordParentLogin(parentId);
@@ -198,6 +284,42 @@ parentLoginForm.addEventListener('submit', async (e) => {
     } catch (error) {
         loginError.textContent = error.message;
         loginError.classList.remove('hidden');
+        document.getElementById('loading').classList.add('hidden');
+    }
+});
+
+// First-Time Activation Form Submission
+activationForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    activationError.classList.add('hidden');
+    
+    const code = document.getElementById('act-code').value.trim();
+    const p1 = document.getElementById('act-password').value;
+    const p2 = document.getElementById('act-confirm-password').value;
+
+    if (p1 !== p2) {
+        activationError.textContent = "Passwords do not match. Please re-enter.";
+        activationError.classList.remove('hidden');
+        return;
+    }
+
+    document.getElementById('loading').classList.remove('hidden');
+
+    try {
+        const result = await DataService.activateAccountWithToken(code, p1);
+        alert(`🎉 Account successfully activated! Welcome, ${result.user.name || result.user.parentName}`);
+        
+        currentUser = {
+            name: result.user.name || result.user.parentName,
+            email: result.user.email || result.user.parentPhone,
+            phone: result.user.parentPhone || '',
+            role: result.role
+        };
+        localStorage.setItem('minyara_auth_session', JSON.stringify(currentUser));
+        await loadDashboard();
+    } catch (err) {
+        activationError.textContent = err.message;
+        activationError.classList.remove('hidden');
         document.getElementById('loading').classList.add('hidden');
     }
 });
@@ -250,7 +372,7 @@ async function loadDashboard() {
         cBtn.click();
     } else { // Parent
         const pBtn = addNavItem('My Children', '👨‍👦', () => renderParentChildren(currentUser.phone || currentUser.email));
-        addNavItem('Fee History', '💳', () => renderParentPayments());
+        addNavItem('Fee Statements', '💳', () => renderParentPayments());
         pBtn.click();
     }
     
@@ -266,13 +388,14 @@ function addNavItem(label, icon, callback) {
         e.preventDefault();
         document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
         a.classList.add('active');
+        closeMobileSidebar();
         if (callback) callback();
     });
     navMenu.appendChild(a);
     return a;
 }
 
-// Dark / Light Theme Toggle with instant select options contrast update
+// Dark / Light Theme Toggle
 let isDark = true;
 document.documentElement.setAttribute('data-theme', 'dark');
 

@@ -12,8 +12,10 @@ export const DATABASE_ID = 'minyara_db';
 export const COLLECTIONS = {
     STUDENTS: 'students',
     CLASSES: 'classes',
-    ENROLLMENTS: 'class_enrollments',
-    PAYMENTS: 'payments'
+    PAYMENTS: 'payments',
+    TEACHERS: 'teachers',
+    PARENTS: 'parents',
+    SETTINGS: 'settings'
 };
 
 export { ID, Query };

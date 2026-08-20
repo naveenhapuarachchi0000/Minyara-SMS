@@ -3,9 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Minyara SMS</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Minyara SMS - Sri Lankan Best Student Management System</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/src/style.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   </head>
@@ -16,90 +16,140 @@
         <div class="spinner"></div>
       </div>
 
+      <!-- Mobile Sidebar Backdrop -->
+      <div id="sidebar-backdrop" class="sidebar-backdrop hidden"></div>
+
       <!-- Login View -->
       <div id="login-view" class="view hidden">
         <div class="login-container glass">
           <div class="logo">
-            <!-- Customizable Logo Placeholder -->
-            <img id="app-logo" src="/vite.svg" alt="Minyara SMS Logo" />
+            <img id="app-logo" src="https://images.unsplash.com/photo-1546410531-bb4caa6b424d?w=120&auto=format&fit=crop&q=80" alt="Minyara SMS Logo" />
             <h1>Minyara SMS</h1>
+            <p style="color: var(--text-secondary); font-size: 13px; margin-top: -16px; margin-bottom: 20px;">Sri Lanka Best Students Management System</p>
           </div>
           
           <div class="tabs">
             <button class="tab-btn active" data-role="admin">Admin / Teacher</button>
-            <button class="tab-btn" data-role="parent">Parent</button>
+            <button class="tab-btn" data-role="parent">Parent Portal</button>
           </div>
 
-          <!-- Email Login Form -->
+          <!-- Email Login Form (Admin & Teacher) -->
           <form id="email-login-form" class="auth-form">
             <div class="input-group">
-              <label for="email">Email</label>
-              <input type="email" id="email" required placeholder="Enter your email" />
+              <label for="email">Email Address</label>
+              <input type="email" id="email" required placeholder="name@minyara.lk" autocomplete="username" />
             </div>
             <div class="input-group">
               <label for="password">Password</label>
-              <input type="password" id="password" required placeholder="Enter your password" />
+              <input type="password" id="password" required placeholder="Enter password" autocomplete="current-password" />
             </div>
-            <button type="submit" class="btn primary">Login</button>
+            <button type="submit" class="btn primary" style="width: 100%; margin-top: 4px;">Sign In to Dashboard</button>
           </form>
 
-          <!-- Parent PIN Login Form -->
+          <!-- Parent Login Form -->
           <form id="parent-login-form" class="auth-form hidden">
             <div class="input-group">
               <label for="parentId">Parent ID (Phone Number)</label>
-              <input type="text" id="parentId" required placeholder="Enter your Parent ID" />
+              <input type="tel" id="parentId" required placeholder="e.g. 0771234567" autocomplete="tel" />
             </div>
             <div class="input-group">
-              <label for="pin">PIN</label>
-              <input type="password" id="pin" required placeholder="Enter your 6-digit PIN" />
+              <label for="pin">Security PIN / Password</label>
+              <input type="password" id="pin" required placeholder="Enter 4-6 digit PIN" autocomplete="current-password" />
             </div>
-            <button type="submit" class="btn primary">Login as Parent</button>
+            <button type="submit" class="btn primary" style="width: 100%; margin-top: 4px;">Access Parent Portal</button>
           </form>
+
+          <div id="activation-prompt" style="margin-top: 18px; padding-top: 14px; border-top: 1px dashed var(--border-color); font-size: 12.5px; color: var(--text-secondary);">
+            First time logging in? <a href="#" id="open-activation-btn" style="color: var(--primary-color); font-weight: 600;">Scan / Enter Activation Code</a>
+          </div>
           
           <div id="login-error" class="error-msg hidden"></div>
         </div>
       </div>
 
-      <!-- Dashboard Layout -->
-      <div id="dashboard-view" class="view hidden">
-        <aside class="sidebar glass">
+      <!-- First-Time QR Activation View -->
+      <div id="activation-view" class="view hidden">
+        <div class="login-container glass">
           <div class="logo">
-            <img src="/vite.svg" alt="Logo" class="small-logo" />
-            <h2>Minyara SMS</h2>
+            <img class="small-logo" src="https://images.unsplash.com/photo-1546410531-bb4caa6b424d?w=120&auto=format&fit=crop&q=80" alt="Logo" style="width: 64px; height: 64px; margin: 0 auto 10px;" />
+            <h2 style="font-size: 20px; font-weight: 800;">First-Time Account Activation</h2>
+            <p style="color: var(--text-secondary); font-size: 13px; margin-top: 4px;">Set your permanent password after scanning onboarding QR code</p>
           </div>
+
+          <form id="activation-form" class="auth-form" style="margin-top: 16px;">
+            <div class="input-group">
+              <label for="act-code">Activation Code / Token *</label>
+              <input type="text" id="act-code" required placeholder="Paste or scan activation token" />
+            </div>
+
+            <div class="input-group">
+              <label for="act-password">Create New Password / PIN *</label>
+              <input type="password" id="act-password" required placeholder="Enter new password" minlength="4" />
+            </div>
+
+            <div class="input-group">
+              <label for="act-confirm-password">Confirm Password / PIN *</label>
+              <input type="password" id="act-confirm-password" required placeholder="Re-enter password" minlength="4" />
+            </div>
+
+            <button type="submit" class="btn primary" style="width: 100%; margin-top: 6px;">Activate & Log In</button>
+            <button type="button" id="act-back-login-btn" class="btn secondary" style="width: 100%;">Back to Login</button>
+          </form>
+
+          <div id="activation-error" class="error-msg hidden"></div>
+        </div>
+      </div>
+
+      <!-- Dashboard Layout (Fully Responsive) -->
+      <div id="dashboard-view" class="view hidden">
+        <!-- Sidebar Navigation -->
+        <aside id="app-sidebar" class="sidebar glass">
+          <div class="logo flex-between">
+            <div class="flex" style="gap: 10px;">
+              <img src="https://images.unsplash.com/photo-1546410531-bb4caa6b424d?w=120&auto=format&fit=crop&q=80" alt="Logo" class="small-logo" />
+              <h2>Minyara SMS</h2>
+            </div>
+            <button id="sidebar-close-btn" class="icon-btn mobile-only">✖</button>
+          </div>
+
           <nav id="nav-menu">
-            <!-- Nav items injected via JS based on role -->
+            <!-- Dynamic Navigation injected via JS based on role -->
           </nav>
+
           <div class="user-info">
-            <span id="current-user-name">User Name</span>
-            <span id="current-user-role" class="badge">Role</span>
-            <button id="logout-btn" class="btn secondary small">Logout</button>
+            <div class="flex-between">
+              <span id="current-user-name">User Name</span>
+              <span id="current-user-role" class="badge">Role</span>
+            </div>
+            <button id="logout-btn" class="btn secondary small mt-2" style="width: 100%;">🚪 Logout</button>
           </div>
         </aside>
         
+        <!-- Main Content Area -->
         <main class="main-content">
-          <header class="top-header glass">
-            <h2 id="page-title">Dashboard</h2>
-            <!-- Admin editable logo area -->
-            <div class="header-actions">
-              <button id="theme-toggle" class="btn icon-btn">🌓</button>
+          <header class="top-header glass flex-between">
+            <div class="flex" style="gap: 12px;">
+              <button id="mobile-menu-btn" class="icon-btn mobile-only" title="Toggle Navigation">☰</button>
+              <h2 id="page-title">Dashboard</h2>
+            </div>
+            <div class="header-actions flex" style="gap: 10px;">
+              <button id="theme-toggle" class="btn icon-btn" title="Toggle Dark/Light Mode">🌓</button>
             </div>
           </header>
           
           <div id="content-area" class="content-area">
-            <!-- Dynamic content goes here -->
+            <!-- Content views dynamically loaded -->
           </div>
         </main>
       </div>
 
-      <!-- Public QR Code View -->
+      <!-- Public QR Code View (Mobile Optimized) -->
       <div id="qr-public-view" class="view hidden">
         <div class="public-container glass">
-          <h2>Student Record</h2>
           <div id="public-student-details">
             <!-- Injected via JS -->
           </div>
-          <button id="qr-back-btn" class="btn secondary mt-4">Back to Login</button>
+          <button id="qr-back-btn" class="btn secondary mt-4" style="width: 100%;">⬅️ Back to Portal</button>
         </div>
       </div>
 
