@@ -1627,8 +1627,8 @@ export async function renderSystemSettings() {
 
                     <div style="margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap;">
                         <button id="btn-config-supabase" class="btn small primary">⚙️ Supabase API Credentials</button>
-                        <button id="btn-sync-to-supabase" class="btn small secondary">🔄 Sync / Seed to Supabase</button>
-                        <button id="btn-view-sql-schema" class="btn small secondary">📋 View SQL Schema Script</button>
+                        <button id="btn-sync-to-supabase" class="btn small secondary">🔄 Push / Sync Data to Supabase</button>
+                        <a href="https://supabase.com/dashboard/project/bcltumkwqajjjeodzntc" target="_blank" rel="noopener noreferrer" class="btn small secondary" style="text-decoration: none; display: inline-flex; align-items: center;">📊 Supabase Dashboard</a>
                     </div>
                 </div>
 
@@ -1670,121 +1670,6 @@ export async function renderSystemSettings() {
                     <button type="submit" class="btn primary mt-4">Save & Connect Supabase</button>
                     <button type="button" id="btn-reset-supabase" class="btn secondary mt-2" style="width: 100%;">Reset to .env Defaults</button>
                 </form>
-            </div>
-        </div>
-
-        <!-- SQL Schema Modal -->
-        <div id="sql-schema-modal" class="overlay hidden flex-center">
-            <div class="glass modal-box" style="width: 100%; max-width: 680px; padding: 28px; position: relative;">
-                <button id="close-sql-modal" class="icon-btn" style="position: absolute; right: 15px; top: 15px;">✖</button>
-                <h3>📄 Supabase SQL Migration Script</h3>
-                <p style="color: var(--text-secondary); font-size: 13px; margin: 6px 0 14px;">
-                    Run this SQL script in your <strong>Supabase SQL Editor</strong> to create all tables (students, classes, payments, teachers, parents, settings), RLS policies, and sample data.
-                </p>
-                <div style="max-height: 320px; overflow-y: auto; background: rgba(0,0,0,0.4); padding: 14px; border-radius: 8px; font-family: monospace; font-size: 12px; color: #a5f3fc; white-space: pre-wrap; user-select: all;" id="sql-schema-code">-- Find full file at scripts/supabase_schema.sql
-CREATE TABLE IF NOT EXISTS settings (
-    id TEXT PRIMARY KEY DEFAULT 'default_settings',
-    app_name TEXT DEFAULT 'Minyara SMS',
-    institution_name TEXT DEFAULT 'Minyara Academy Sri Lanka',
-    logo_url TEXT,
-    primary_color TEXT DEFAULT '#6366f1',
-    currency TEXT DEFAULT 'LKR (Rs.)',
-    address TEXT,
-    contact_phone TEXT,
-    email TEXT,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS classes (
-    id TEXT PRIMARY KEY,
-    class_name TEXT NOT NULL,
-    syllabus TEXT NOT NULL,
-    grade TEXT DEFAULT 'Grade 11',
-    teacher_name TEXT DEFAULT '',
-    fee NUMERIC DEFAULT 0,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS students (
-    id TEXT PRIMARY KEY,
-    full_name TEXT NOT NULL,
-    grade TEXT DEFAULT 'Grade 11',
-    dob TEXT,
-    age INTEGER DEFAULT 16,
-    join_date TEXT DEFAULT '2026-08-21',
-    school TEXT,
-    parent_name TEXT,
-    parent_phone TEXT NOT NULL,
-    parent_phone_optional TEXT,
-    syllabus TEXT DEFAULT 'Cambridge',
-    is_active BOOLEAN DEFAULT TRUE,
-    qr_code_token TEXT UNIQUE,
-    enrolled_class_ids JSONB DEFAULT '[]'::jsonb,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS payments (
-    id TEXT PRIMARY KEY,
-    student_id TEXT NOT NULL,
-    student_name TEXT,
-    class_id TEXT,
-    class_name TEXT,
-    receipt_no TEXT NOT NULL,
-    month TEXT DEFAULT 'August 2026',
-    amount NUMERIC NOT NULL DEFAULT 0,
-    status TEXT DEFAULT 'Paid',
-    date TIMESTAMPTZ DEFAULT NOW(),
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS teachers (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    email TEXT UNIQUE NOT NULL,
-    phone TEXT,
-    subject TEXT,
-    password TEXT,
-    is_activated BOOLEAN DEFAULT FALSE,
-    activation_token TEXT UNIQUE,
-    is_suspended BOOLEAN DEFAULT FALSE,
-    has_logged_in BOOLEAN DEFAULT FALSE,
-    last_login TEXT DEFAULT 'Never',
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS parents (
-    id TEXT PRIMARY KEY,
-    parent_name TEXT NOT NULL,
-    parent_phone TEXT UNIQUE NOT NULL,
-    pin TEXT,
-    is_activated BOOLEAN DEFAULT FALSE,
-    activation_token TEXT UNIQUE,
-    is_suspended BOOLEAN DEFAULT FALSE,
-    has_logged_in BOOLEAN DEFAULT FALSE,
-    last_login TEXT DEFAULT 'Never',
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Row Level Security (RLS)
-ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
-ALTER TABLE classes ENABLE ROW LEVEL SECURITY;
-ALTER TABLE students ENABLE ROW LEVEL SECURITY;
-ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
-ALTER TABLE teachers ENABLE ROW LEVEL SECURITY;
-ALTER TABLE parents ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Allow all access on settings" ON settings FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all access on classes" ON classes FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all access on students" ON students FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all access on payments" ON payments FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all access on teachers" ON teachers FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all access on parents" ON parents FOR ALL USING (true) WITH CHECK (true);</div>
-                <button id="btn-copy-sql" class="btn primary mt-4" style="width: 100%;">📋 Copy Full SQL Script</button>
             </div>
         </div>
     `;
@@ -1858,23 +1743,5 @@ CREATE POLICY "Allow all access on parents" ON parents FOR ALL USING (true) WITH
                 renderSystemSettings();
             }
         }
-    });
-
-    // SQL Schema Modal events
-    document.getElementById('btn-view-sql-schema').addEventListener('click', () => {
-        document.getElementById('sql-schema-modal').classList.remove('hidden');
-    });
-
-    document.getElementById('close-sql-modal').addEventListener('click', () => {
-        document.getElementById('sql-schema-modal').classList.add('hidden');
-    });
-
-    document.getElementById('btn-copy-sql').addEventListener('click', () => {
-        const sql = document.getElementById('sql-schema-code').innerText;
-        navigator.clipboard.writeText(sql).then(() => {
-            alert('Supabase SQL Schema copied to clipboard! Paste and run in your Supabase SQL Editor.');
-        }).catch(() => {
-            alert('Please select and copy the SQL text manually from the box.');
-        });
     });
 }
