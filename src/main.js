@@ -1,6 +1,6 @@
-// main.js - Central Application Engine with Mobile Drawer, QR Activation Flow, & Activity Sync
+// main.js - Central Application Engine with Mobile Drawer, QR Activation Flow, Realtime Sync & Session Persistence
 
-import { supabase } from './supabase.js';
+import { supabase, subscribeToTable } from './supabase.js';
 import { DataService } from './dataService.js';
 import { 
     renderAdminDashboard, 
@@ -16,6 +16,7 @@ import { renderParentChildren, renderParentPayments } from './parent.js';
 import { renderPublicQrView } from './qr.js';
 
 let currentUser = null;
+let currentActiveViewCallback = null;
 
 // DOM Elements
 const loginView = document.getElementById('login-view');
@@ -47,7 +48,7 @@ async function init() {
     // Sync Branding & Logo
     const settings = await DataService.getSettings();
     document.querySelectorAll('#app-logo, .small-logo').forEach(img => {
-        if (img) img.src = settings.logoUrl;
+        if (img && settings.logoUrl) img.src = settings.logoUrl;
     });
 
     // Robust URL parameters parsing for mobile camera QR scanners
@@ -80,31 +81,24 @@ async function init() {
         return;
     }
 
-    // Check existing active session
+    // Check existing active session - persistent across browser refresh
     const savedUser = localStorage.getItem('minyara_auth_session');
     if (savedUser) {
         try {
             currentUser = JSON.parse(savedUser);
-            await loadDashboard();
-            return;
-        } catch(e) {}
+            if (currentUser && (currentUser.email || currentUser.phone)) {
+                await loadDashboard();
+                initRealtimeSubscriptions();
+                return;
+            }
+        } catch(e) {
+            localStorage.removeItem('minyara_auth_session');
+        }
     }
 
-    try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session && session.user) {
-            currentUser = {
-                name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
-                email: session.user.email,
-                role: session.user.user_metadata?.role || (session.user.email.includes('admin') ? 'Admin' : 'Teacher')
-            };
-            await loadDashboard();
-        } else {
-            showLoginView();
-        }
-    } catch (error) {
-        showLoginView();
-    }
+    // If no saved user, stay cleanly on login view
+    showLoginView();
+    initRealtimeSubscriptions();
 }
 
 // UI State Management
@@ -219,7 +213,7 @@ document.getElementById('act-back-login-btn').addEventListener('click', () => {
     showLoginView();
 });
 
-// Admin / Teacher Email Login with First-Time QR Activation & Suspension Guard
+// Admin / Teacher Email Login (Credentials & Re-login)
 emailLoginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     loginError.classList.add('hidden');
@@ -229,17 +223,18 @@ emailLoginForm.addEventListener('submit', async (e) => {
     const password = document.getElementById('password').value.trim();
 
     try {
-        // 1. Check if email belongs to a Teacher
+        // 1. Check if email belongs to a registered Teacher
         const teacher = await DataService.getTeacherByEmail(email);
         if (teacher) {
             if (teacher.isSuspended) {
                 throw new Error("⛔ Account Suspended: Your teacher account has been suspended by administration.");
             }
-            if (teacher.isActivated === false) {
+            if (teacher.password) {
+                if (teacher.password !== password) {
+                    throw new Error("Incorrect password. Please verify your password.");
+                }
+            } else if (teacher.isActivated === false) {
                 throw new Error("⚠️ First-Time Setup Required: Please scan your onboarding QR code first to set your password and activate your account.");
-            }
-            if (teacher.password && teacher.password !== password) {
-                throw new Error("Incorrect password. Please verify your password.");
             }
 
             await DataService.recordTeacherLogin(email);
@@ -262,6 +257,7 @@ emailLoginForm.addEventListener('submit', async (e) => {
             }
         }
 
+        // Save session locally for persistence
         localStorage.setItem('minyara_auth_session', JSON.stringify(currentUser));
         await loadDashboard();
     } catch (error) {
@@ -271,7 +267,7 @@ emailLoginForm.addEventListener('submit', async (e) => {
     }
 });
 
-// Parent Phone + PIN Login with First-Time QR Activation & Suspension Guard
+// Parent Phone + PIN Login (Credentials & Re-login)
 parentLoginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     loginError.classList.add('hidden');
@@ -291,17 +287,20 @@ parentLoginForm.addEventListener('submit', async (e) => {
             if (parent.isSuspended) {
                 throw new Error("⛔ Access Denied: Your parent account has been suspended by administration.");
             }
-            if (parent.isActivated === false) {
+            if (parent.pin) {
+                if (parent.pin !== pin) {
+                    throw new Error("Incorrect PIN. Please verify your 4-6 digit security PIN.");
+                }
+            } else if (parent.isActivated === false) {
                 throw new Error("⚠️ First-Time Setup Required: Please scan your onboarding QR code first to create your security PIN and activate your portal.");
-            }
-            if (parent.pin && parent.pin !== pin) {
-                throw new Error("Incorrect PIN. Please verify your 4-6 digit PIN.");
             }
         } else {
             const students = await DataService.getStudentsByParentPhone(parentId);
             if (!students || students.length === 0) {
                 throw new Error("Parent phone number not found in student records. Please contact school administration.");
             }
+            // Auto-register parent record with this PIN
+            await DataService.ensureParentRegistered(students[0].parentName || 'Parent', parentId);
         }
 
         await DataService.recordParentLogin(parentId);
@@ -312,6 +311,7 @@ parentLoginForm.addEventListener('submit', async (e) => {
             role: 'Parent' 
         };
 
+        // Save session locally for persistence
         localStorage.setItem('minyara_auth_session', JSON.stringify(currentUser));
         await loadDashboard();
     } catch (error) {
@@ -378,19 +378,32 @@ activationForm.addEventListener('submit', async (e) => {
     }
 });
 
-// Logout
+// Explicit Logout Action: Only logs out when the user clicks this button
 logoutBtn.addEventListener('click', async () => {
     document.getElementById('loading').classList.remove('hidden');
     try {
         await supabase.auth.signOut();
     } catch (error) {}
+    
+    // Clear saved session completely
     localStorage.removeItem('minyara_auth_session');
+    sessionStorage.clear();
     currentUser = null;
+    currentActiveViewCallback = null;
+    
+    // Reset login form fields
+    document.getElementById('email').value = '';
+    document.getElementById('password').value = '';
+    document.getElementById('parentId').value = '';
+    document.getElementById('pin').value = '';
+    loginError.classList.add('hidden');
+    
     showLoginView();
 });
 
 // Dashboard View Loader & Role Router
 async function loadDashboard() {
+    if (!currentUser) return;
     currentUserName.textContent = currentUser.name || currentUser.email;
     
     let role = currentUser.role;
@@ -443,10 +456,28 @@ function addNavItem(label, icon, callback) {
         document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
         a.classList.add('active');
         closeMobileSidebar();
+        currentActiveViewCallback = callback;
         if (callback) callback();
     });
     navMenu.appendChild(a);
     return a;
+}
+
+// Real-Time Supabase Sync Subscriptions
+let realtimeInitialized = false;
+function initRealtimeSubscriptions() {
+    if (realtimeInitialized) return;
+    realtimeInitialized = true;
+
+    const tables = ['students', 'classes', 'payments', 'teachers', 'parents', 'settings'];
+    tables.forEach(tableName => {
+        subscribeToTable(tableName, () => {
+            // If the user is currently on a view, refresh it quietly
+            if (currentUser && currentActiveViewCallback) {
+                currentActiveViewCallback();
+            }
+        });
+    });
 }
 
 // Dark / Light Theme Toggle

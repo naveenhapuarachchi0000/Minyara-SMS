@@ -2,8 +2,8 @@
 
 import { supabase, TABLES, isSupabaseConfigured } from './supabase.js';
 
-// Safe timeout wrapper for remote database calls
-function withTimeout(promise, ms = 3000) {
+// Safe timeout wrapper for remote database calls (10 seconds)
+function withTimeout(promise, ms = 10000) {
     return Promise.race([
         promise,
         new Promise((_, reject) => setTimeout(() => reject(new Error('Supabase request timeout')), ms))
