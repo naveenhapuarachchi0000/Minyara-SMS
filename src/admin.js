@@ -1,6 +1,7 @@
 // admin.js - Complete Administration Engine with Full Edit/Delete Across All Modules & Class/Grade Graphs
 
 import { DataService } from './dataService.js';
+import { testSupabaseConnection, updateSupabaseCredentials } from './supabase.js';
 
 const contentArea = document.getElementById('content-area');
 
@@ -1539,18 +1540,26 @@ export async function renderParentsManagement() {
 // 7. SYSTEM SETTINGS PAGE
 // =========================================================================
 export async function renderSystemSettings() {
-    document.getElementById('page-title').textContent = "System Settings & Configuration";
+    document.getElementById('page-title').textContent = "System Settings & Database";
     contentArea.innerHTML = `<div class="glass flex-center" style="padding: 40px;"><div class="spinner"></div></div>`;
 
     const settings = await DataService.getSettings();
     const teachers = await DataService.getTeachers();
     const parents = await DataService.getParents();
+    const students = await DataService.getStudents(false);
+    const classes = await DataService.getClasses();
+    const payments = await DataService.getPayments();
+
+    const connStatus = await testSupabaseConnection();
+    const customUrl = localStorage.getItem('minyara_supabase_url') || import.meta.env.VITE_SUPABASE_URL || '';
+    const customKey = localStorage.getItem('minyara_supabase_key') || import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
     const suspendedTeachers = teachers.filter(t => t.isSuspended);
     const suspendedParents = parents.filter(p => p.isSuspended);
 
     contentArea.innerHTML = `
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px;">
+            <!-- Branding Settings -->
             <div class="card glass">
                 <div class="card-header">
                     <h3>🎨 Institution Branding & Logo</h3>
@@ -1583,23 +1592,47 @@ export async function renderSystemSettings() {
                 </form>
             </div>
 
+            <!-- Supabase Cloud & Account Controls -->
             <div style="display: flex; flex-direction: column; gap: 20px;">
-                <div class="card glass">
-                    <div class="card-header">
-                        <h3>☁️ Appwrite Cloud Database</h3>
+                <div class="card glass" style="border-top: 4px solid #10b981;">
+                    <div class="card-header flex-between">
+                        <h3>⚡ Supabase Cloud Database</h3>
+                        <span class="badge" style="background: ${connStatus.connected ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 158, 11, 0.2)'}; color: ${connStatus.connected ? '#10b981' : '#f59e0b'};">
+                            ${connStatus.connected ? '● LIVE POSTGRESQL' : '● RESILIENT FALLBACK'}
+                        </span>
                     </div>
-                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
-                        <span style="font-size: 24px;">🟢</span>
+
+                    <div style="display: flex; align-items: center; gap: 12px; margin: 16px 0;">
+                        <span style="font-size: 28px;">${connStatus.connected ? '🟢' : '🟡'}</span>
                         <div>
-                            <div style="font-weight: 700; font-size: 15px;">Appwrite Database: MinyaraDB</div>
-                            <small style="color: var(--text-secondary);">Project ID: <code>6a873ee0000f018920d8</code></small>
+                            <div style="font-weight: 700; font-size: 15px;">Supabase PostgreSQL DB</div>
+                            <small style="color: var(--text-secondary); word-break: break-all;">${connStatus.url || 'Not configured'}</small>
                         </div>
                     </div>
-                    <div class="detail-row"><span class="detail-label">Endpoint:</span><span class="detail-value">fra.cloud.appwrite.io/v1</span></div>
-                    <div class="detail-row"><span class="detail-label">Collections:</span><span class="detail-value">Students, Classes, Payments, Teachers</span></div>
-                    <div class="detail-row"><span class="detail-label">Sync Engine:</span><span class="detail-value" style="color: #10b981;">Active & Ready</span></div>
+
+                    <div class="detail-row">
+                        <span class="detail-label">Connection Status:</span>
+                        <span class="detail-value" style="color: ${connStatus.connected ? '#10b981' : '#f59e0b'}; font-weight: 600;">
+                            ${connStatus.message}
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Tables Active:</span>
+                        <span class="detail-value">Students (${students.length}), Classes (${classes.length}), Payments (${payments.length}), Teachers (${teachers.length}), Parents (${parents.length})</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Real-Time Sync:</span>
+                        <span class="detail-value" style="color: #10b981;">Bi-Directional Engine Enabled</span>
+                    </div>
+
+                    <div style="margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button id="btn-config-supabase" class="btn small primary">⚙️ Supabase API Credentials</button>
+                        <button id="btn-sync-to-supabase" class="btn small secondary">🔄 Sync / Seed to Supabase</button>
+                        <button id="btn-view-sql-schema" class="btn small secondary">📋 View SQL Schema Script</button>
+                    </div>
                 </div>
 
+                <!-- Suspended Accounts -->
                 <div class="card glass">
                     <div class="card-header">
                         <h3>🚫 Suspended Accounts Overview</h3>
@@ -1614,6 +1647,144 @@ export async function renderSystemSettings() {
                         <span class="detail-value" style="color: ${suspendedParents.length ? '#ef4444' : '#10b981'};">${suspendedParents.length} Accounts</span>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- Supabase Credentials Modal -->
+        <div id="supabase-config-modal" class="overlay hidden flex-center">
+            <div class="glass modal-box" style="width: 100%; max-width: 520px; padding: 28px; position: relative;">
+                <button id="close-supabase-modal" class="icon-btn" style="position: absolute; right: 15px; top: 15px;">✖</button>
+                <h3>⚡ Supabase Cloud Configuration</h3>
+                <p style="color: var(--text-secondary); font-size: 13px; margin: 6px 0 16px;">
+                    Enter your Supabase Project URL and Anon Public API Key. You can find these in your Supabase Dashboard under <strong>Project Settings -> API</strong>.
+                </p>
+                <form id="supabase-config-form" class="auth-form">
+                    <div class="input-group">
+                        <label>Supabase Project URL</label>
+                        <input type="url" id="sb-input-url" placeholder="https://your-project.supabase.co" value="${customUrl}" required>
+                    </div>
+                    <div class="input-group">
+                        <label>Supabase Anon Public API Key</label>
+                        <input type="password" id="sb-input-key" placeholder="eyJhbGciOi..." value="${customKey}" required>
+                    </div>
+                    <button type="submit" class="btn primary mt-4">Save & Connect Supabase</button>
+                    <button type="button" id="btn-reset-supabase" class="btn secondary mt-2" style="width: 100%;">Reset to .env Defaults</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- SQL Schema Modal -->
+        <div id="sql-schema-modal" class="overlay hidden flex-center">
+            <div class="glass modal-box" style="width: 100%; max-width: 680px; padding: 28px; position: relative;">
+                <button id="close-sql-modal" class="icon-btn" style="position: absolute; right: 15px; top: 15px;">✖</button>
+                <h3>📄 Supabase SQL Migration Script</h3>
+                <p style="color: var(--text-secondary); font-size: 13px; margin: 6px 0 14px;">
+                    Run this SQL script in your <strong>Supabase SQL Editor</strong> to create all tables (students, classes, payments, teachers, parents, settings), RLS policies, and sample data.
+                </p>
+                <div style="max-height: 320px; overflow-y: auto; background: rgba(0,0,0,0.4); padding: 14px; border-radius: 8px; font-family: monospace; font-size: 12px; color: #a5f3fc; white-space: pre-wrap; user-select: all;" id="sql-schema-code">-- Find full file at scripts/supabase_schema.sql
+CREATE TABLE IF NOT EXISTS settings (
+    id TEXT PRIMARY KEY DEFAULT 'default_settings',
+    app_name TEXT DEFAULT 'Minyara SMS',
+    institution_name TEXT DEFAULT 'Minyara Academy Sri Lanka',
+    logo_url TEXT,
+    primary_color TEXT DEFAULT '#6366f1',
+    currency TEXT DEFAULT 'LKR (Rs.)',
+    address TEXT,
+    contact_phone TEXT,
+    email TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS classes (
+    id TEXT PRIMARY KEY,
+    class_name TEXT NOT NULL,
+    syllabus TEXT NOT NULL,
+    grade TEXT DEFAULT 'Grade 11',
+    teacher_name TEXT DEFAULT '',
+    fee NUMERIC DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS students (
+    id TEXT PRIMARY KEY,
+    full_name TEXT NOT NULL,
+    grade TEXT DEFAULT 'Grade 11',
+    dob TEXT,
+    age INTEGER DEFAULT 16,
+    join_date TEXT DEFAULT '2026-08-21',
+    school TEXT,
+    parent_name TEXT,
+    parent_phone TEXT NOT NULL,
+    parent_phone_optional TEXT,
+    syllabus TEXT DEFAULT 'Cambridge',
+    is_active BOOLEAN DEFAULT TRUE,
+    qr_code_token TEXT UNIQUE,
+    enrolled_class_ids JSONB DEFAULT '[]'::jsonb,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS payments (
+    id TEXT PRIMARY KEY,
+    student_id TEXT NOT NULL,
+    student_name TEXT,
+    class_id TEXT,
+    class_name TEXT,
+    receipt_no TEXT NOT NULL,
+    month TEXT DEFAULT 'August 2026',
+    amount NUMERIC NOT NULL DEFAULT 0,
+    status TEXT DEFAULT 'Paid',
+    date TIMESTAMPTZ DEFAULT NOW(),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS teachers (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    phone TEXT,
+    subject TEXT,
+    password TEXT,
+    is_activated BOOLEAN DEFAULT FALSE,
+    activation_token TEXT UNIQUE,
+    is_suspended BOOLEAN DEFAULT FALSE,
+    has_logged_in BOOLEAN DEFAULT FALSE,
+    last_login TEXT DEFAULT 'Never',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS parents (
+    id TEXT PRIMARY KEY,
+    parent_name TEXT NOT NULL,
+    parent_phone TEXT UNIQUE NOT NULL,
+    pin TEXT,
+    is_activated BOOLEAN DEFAULT FALSE,
+    activation_token TEXT UNIQUE,
+    is_suspended BOOLEAN DEFAULT FALSE,
+    has_logged_in BOOLEAN DEFAULT FALSE,
+    last_login TEXT DEFAULT 'Never',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Row Level Security (RLS)
+ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE classes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE students ENABLE ROW LEVEL SECURITY;
+ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE teachers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE parents ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow all access on settings" ON settings FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all access on classes" ON classes FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all access on students" ON students FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all access on payments" ON payments FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all access on teachers" ON teachers FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all access on parents" ON parents FOR ALL USING (true) WITH CHECK (true);</div>
+                <button id="btn-copy-sql" class="btn primary mt-4" style="width: 100%;">📋 Copy Full SQL Script</button>
             </div>
         </div>
     `;
@@ -1641,5 +1812,69 @@ export async function renderSystemSettings() {
         } finally {
             renderSystemSettings();
         }
+    });
+
+    // Supabase Config Modal events
+    document.getElementById('btn-config-supabase').addEventListener('click', () => {
+        document.getElementById('supabase-config-modal').classList.remove('hidden');
+    });
+
+    document.getElementById('close-supabase-modal').addEventListener('click', () => {
+        document.getElementById('supabase-config-modal').classList.add('hidden');
+    });
+
+    document.getElementById('supabase-config-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const url = document.getElementById('sb-input-url').value;
+        const key = document.getElementById('sb-input-key').value;
+        updateSupabaseCredentials(url, key);
+        alert('Supabase credentials saved! Re-testing connection...');
+        document.getElementById('supabase-config-modal').classList.add('hidden');
+        renderSystemSettings();
+    });
+
+    document.getElementById('btn-reset-supabase').addEventListener('click', () => {
+        updateSupabaseCredentials(null, null);
+        alert('Supabase credentials reset to .env defaults.');
+        document.getElementById('supabase-config-modal').classList.add('hidden');
+        renderSystemSettings();
+    });
+
+    document.getElementById('btn-sync-to-supabase').addEventListener('click', async () => {
+        if (!connStatus.isConfigured) {
+            alert('Please configure your Supabase Project URL & Anon Key first before syncing.');
+            document.getElementById('supabase-config-modal').classList.remove('hidden');
+            return;
+        }
+        if (confirm('Push and seed all local students, classes, payments, teachers, and settings to your Supabase PostgreSQL cloud database?')) {
+            try {
+                document.getElementById('loading').classList.remove('hidden');
+                const res = await DataService.syncAllLocalToSupabase();
+                alert(`🎉 Cloud Sync Complete!\nSynced to Supabase:\n• ${res.students} Students\n• ${res.classes} Classes\n• ${res.payments} Payments\n• ${res.teachers} Teachers\n• ${res.parents} Parents\n• System Settings`);
+            } catch(e) {
+                alert('Cloud sync failed: ' + e.message);
+            } finally {
+                document.getElementById('loading').classList.add('hidden');
+                renderSystemSettings();
+            }
+        }
+    });
+
+    // SQL Schema Modal events
+    document.getElementById('btn-view-sql-schema').addEventListener('click', () => {
+        document.getElementById('sql-schema-modal').classList.remove('hidden');
+    });
+
+    document.getElementById('close-sql-modal').addEventListener('click', () => {
+        document.getElementById('sql-schema-modal').classList.add('hidden');
+    });
+
+    document.getElementById('btn-copy-sql').addEventListener('click', () => {
+        const sql = document.getElementById('sql-schema-code').innerText;
+        navigator.clipboard.writeText(sql).then(() => {
+            alert('Supabase SQL Schema copied to clipboard! Paste and run in your Supabase SQL Editor.');
+        }).catch(() => {
+            alert('Please select and copy the SQL text manually from the box.');
+        });
     });
 }

@@ -1,6 +1,6 @@
 // main.js - Central Application Engine with Mobile Drawer, QR Activation Flow, & Activity Sync
 
-import { account } from './appwrite.js';
+import { supabase } from './supabase.js';
 import { DataService } from './dataService.js';
 import { 
     renderAdminDashboard, 
@@ -82,14 +82,21 @@ async function init() {
     // Check existing active session
     const savedUser = localStorage.getItem('minyara_auth_session');
     if (savedUser) {
-        currentUser = JSON.parse(savedUser);
-        await loadDashboard();
-        return;
+        try {
+            currentUser = JSON.parse(savedUser);
+            await loadDashboard();
+            return;
+        } catch(e) {}
     }
 
     try {
-        currentUser = await account.get();
-        if (currentUser) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session && session.user) {
+            currentUser = {
+                name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
+                email: session.user.email,
+                role: session.user.user_metadata?.role || (session.user.email.includes('admin') ? 'Admin' : 'Teacher')
+            };
             await loadDashboard();
         } else {
             showLoginView();
@@ -224,8 +231,15 @@ emailLoginForm.addEventListener('submit', async (e) => {
             currentUser = { name: 'System Administrator', email, role: 'Admin' };
         } else {
             try {
-                await account.createEmailPasswordSession(email, password);
-                currentUser = await account.get();
+                const { data, error: sErr } = await supabase.auth.signInWithPassword({ email, password });
+                if (sErr || !data?.user) {
+                    throw new Error(sErr?.message || "Invalid email or password. Please check your credentials.");
+                }
+                currentUser = {
+                    name: data.user.user_metadata?.full_name || email.split('@')[0],
+                    email: data.user.email,
+                    role: data.user.user_metadata?.role || 'Admin'
+                };
             } catch (err) {
                 throw new Error("Invalid email or password. Please check your credentials.");
             }
@@ -343,7 +357,7 @@ activationForm.addEventListener('submit', async (e) => {
 logoutBtn.addEventListener('click', async () => {
     document.getElementById('loading').classList.remove('hidden');
     try {
-        await account.deleteSession('current');
+        await supabase.auth.signOut();
     } catch (error) {}
     localStorage.removeItem('minyara_auth_session');
     currentUser = null;
