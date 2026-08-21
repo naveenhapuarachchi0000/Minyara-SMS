@@ -422,11 +422,11 @@ async function loadDashboard() {
         dBtn.click();
     } else if (role === 'Teacher') {
         const cBtn = addNavItem('My Classes', '🏫', () => renderTeacherClasses(currentUser.email));
-        addNavItem('My Students', '👨‍🎓', renderTeacherStudents);
+        addNavItem('My Students', '👨‍🎓', () => renderTeacherStudents(currentUser.email));
         cBtn.click();
     } else { // Parent
         const pBtn = addNavItem('My Children', '👨‍👦', () => renderParentChildren(currentUser.phone || currentUser.email));
-        addNavItem('Fee Statements', '💳', () => renderParentPayments());
+        addNavItem('Fee Statements', '💳', () => renderParentPayments(currentUser.phone || currentUser.email));
         pBtn.click();
     }
     
