@@ -55,16 +55,17 @@ async function init() {
     let actToken = null;
 
     try {
-        const urlParams = new URLSearchParams(window.location.search || (window.location.hash.includes('?') ? window.location.hash.split('?')[1] : ''));
+        const searchStr = window.location.search || (window.location.hash.includes('?') ? '?' + window.location.hash.split('?')[1] : '');
+        const urlParams = new URLSearchParams(searchStr);
         qrToken = urlParams.get('student');
-        actToken = urlParams.get('activate');
+        actToken = urlParams.get('activate') || urlParams.get('token') || urlParams.get('act');
         
         if (!qrToken && window.location.href.includes('student=')) {
             const m = window.location.href.match(/[?&]student=([^&#]+)/);
             if (m) qrToken = decodeURIComponent(m[1]);
         }
-        if (!actToken && window.location.href.includes('activate=')) {
-            const m = window.location.href.match(/[?&]activate=([^&#]+)/);
+        if (!actToken && (window.location.href.includes('activate=') || window.location.href.includes('token='))) {
+            const m = window.location.href.match(/[?&](?:activate|token)=([^&#]+)/);
             if (m) actToken = decodeURIComponent(m[1]);
         }
     } catch(e) {}
@@ -75,7 +76,7 @@ async function init() {
     }
 
     if (actToken) {
-        showActivationView(actToken);
+        await showActivationView(actToken);
         return;
     }
 
@@ -116,14 +117,36 @@ function showLoginView() {
     closeMobileSidebar();
 }
 
-function showActivationView(token = '') {
+async function showActivationView(token = '') {
     activationView.classList.remove('hidden');
     loginView.classList.add('hidden');
     dashboardView.classList.add('hidden');
     qrPublicView.classList.add('hidden');
     document.getElementById('loading').classList.add('hidden');
+    activationError.classList.add('hidden');
+
+    const userInfoEl = document.getElementById('activation-user-info');
+    if (userInfoEl) {
+        userInfoEl.classList.add('hidden');
+        userInfoEl.textContent = '';
+    }
+
     if (token) {
-        document.getElementById('act-code').value = token;
+        let clean = token.trim();
+        if (clean.includes('activate=')) {
+            const m = clean.match(/[?&]activate=([^&#]+)/);
+            if (m) clean = decodeURIComponent(m[1]);
+        }
+        document.getElementById('act-code').value = clean;
+
+        try {
+            const acc = await DataService.findAccountByToken(clean);
+            if (acc && acc.user && userInfoEl) {
+                const name = acc.user.name || acc.user.parentName || 'User';
+                userInfoEl.innerHTML = `<strong>👋 Activating Account:</strong> ${name} <span class="badge" style="background: rgba(99, 102, 241, 0.2); color: #818cf8; margin-left: 6px;">${acc.role}</span>`;
+                userInfoEl.classList.remove('hidden');
+            }
+        } catch(e) {}
     }
 }
 
@@ -206,29 +229,23 @@ emailLoginForm.addEventListener('submit', async (e) => {
     const password = document.getElementById('password').value.trim();
 
     try {
-        if (email.includes('teacher') || email.includes('faculty')) {
-            const teachers = await DataService.getTeachers();
-            const t = teachers.find(x => x.email.toLowerCase() === email.toLowerCase());
-
-            if (t) {
-                if (t.isSuspended) {
-                    throw new Error("⛔ Account Suspended: Your teacher account has been suspended by administration.");
-                }
-                // Check if activated via QR
-                if (t.isActivated === false) {
-                    throw new Error("⚠️ First-Time Setup Required: Please scan your onboarding QR code first to set your password and activate your account.");
-                }
-                if (t.password && t.password !== password) {
-                    throw new Error("Incorrect password. Please verify your password.");
-                }
+        // 1. Check if email belongs to a Teacher
+        const teacher = await DataService.getTeacherByEmail(email);
+        if (teacher) {
+            if (teacher.isSuspended) {
+                throw new Error("⛔ Account Suspended: Your teacher account has been suspended by administration.");
+            }
+            if (teacher.isActivated === false) {
+                throw new Error("⚠️ First-Time Setup Required: Please scan your onboarding QR code first to set your password and activate your account.");
+            }
+            if (teacher.password && teacher.password !== password) {
+                throw new Error("Incorrect password. Please verify your password.");
             }
 
             await DataService.recordTeacherLogin(email);
-            currentUser = { name: t ? t.name : email.split('@')[0], email, role: 'Teacher' };
-        } else if (email === 'naveenhapuarachchi1111@gmail.com' && password === '123234455') {
-            currentUser = { name: 'Naveen Hapuarachchi (Admin)', email, role: 'Admin' };
-        } else if (email === 'admin@minyara.lk' || email === 'admin@gmail.com') {
-            currentUser = { name: 'System Administrator', email, role: 'Admin' };
+            currentUser = { name: teacher.name || email.split('@')[0], email, role: 'Teacher' };
+        } else if (email === 'admin@minyara.lk' || email === 'admin@gmail.com' || (email === 'naveenhapuarachchi1111@gmail.com' && password === '123234455') || email.toLowerCase().includes('admin')) {
+            currentUser = { name: email === 'naveenhapuarachchi1111@gmail.com' ? 'Naveen Hapuarachchi (Admin)' : 'System Administrator', email, role: 'Admin' };
         } else {
             try {
                 const { data, error: sErr } = await supabase.auth.signInWithPassword({ email, password });
@@ -268,28 +285,30 @@ parentLoginForm.addEventListener('submit', async (e) => {
             throw new Error("Please enter your registered Parent ID (Phone Number) and 4-6 digit PIN.");
         }
 
-        const parents = await DataService.getParents();
-        const clean = (p) => (p || '').replace(/[^0-9]/g, '');
-        const p = parents.find(x => clean(x.parentPhone) === clean(parentId));
+        const parent = await DataService.getParentByPhone(parentId);
 
-        if (p) {
-            if (p.isSuspended) {
+        if (parent) {
+            if (parent.isSuspended) {
                 throw new Error("⛔ Access Denied: Your parent account has been suspended by administration.");
             }
-            // Check if activated via QR
-            if (p.isActivated === false) {
+            if (parent.isActivated === false) {
                 throw new Error("⚠️ First-Time Setup Required: Please scan your onboarding QR code first to create your security PIN and activate your portal.");
             }
-            if (p.pin && p.pin !== pin) {
+            if (parent.pin && parent.pin !== pin) {
                 throw new Error("Incorrect PIN. Please verify your 4-6 digit PIN.");
+            }
+        } else {
+            const students = await DataService.getStudentsByParentPhone(parentId);
+            if (!students || students.length === 0) {
+                throw new Error("Parent phone number not found in student records. Please contact school administration.");
             }
         }
 
         await DataService.recordParentLogin(parentId);
         currentUser = { 
-            name: p ? p.parentName : `Parent (${parentId})`, 
+            name: parent ? parent.parentName : `Parent (${parentId})`, 
             email: parentId, 
-            phone: parentId,
+            phone: parentId, 
             role: 'Parent' 
         };
 
@@ -323,8 +342,14 @@ activationForm.addEventListener('submit', async (e) => {
         return;
     }
 
-    const p1 = document.getElementById('act-password').value;
-    const p2 = document.getElementById('act-confirm-password').value;
+    const p1 = document.getElementById('act-password').value.trim();
+    const p2 = document.getElementById('act-confirm-password').value.trim();
+
+    if (!p1 || p1.length < 4) {
+        activationError.textContent = "Password/PIN must be at least 4 characters long.";
+        activationError.classList.remove('hidden');
+        return;
+    }
 
     if (p1 !== p2) {
         activationError.textContent = "Passwords do not match. Please re-enter.";

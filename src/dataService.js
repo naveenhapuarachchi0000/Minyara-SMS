@@ -912,37 +912,156 @@ export const DataService = {
         return students.filter(s => clean(s.parentPhone) === target || clean(s.parentPhoneOptional) === target);
     },
 
+    async getTeacherByEmail(email) {
+        if (!email) return null;
+        const cleanEmail = email.trim().toLowerCase();
+
+        if (isSupabaseConfigured()) {
+            try {
+                const { data } = await withTimeout(
+                    supabase.from(TABLES.TEACHERS).select('*').ilike('email', cleanEmail).limit(1)
+                );
+                if (data && data.length > 0) {
+                    return mapTeacherRow(data[0]);
+                }
+            } catch(e) {}
+        }
+
+        const local = getLocal('teachers');
+        return local.find(t => (t.email || '').trim().toLowerCase() === cleanEmail) || null;
+    },
+
+    async getTeacherByToken(token) {
+        if (!token) return null;
+        const cleanToken = token.trim().toUpperCase();
+
+        if (isSupabaseConfigured()) {
+            try {
+                const { data } = await withTimeout(
+                    supabase.from(TABLES.TEACHERS).select('*').ilike('activation_token', cleanToken).limit(1)
+                );
+                if (data && data.length > 0) {
+                    return mapTeacherRow(data[0]);
+                }
+            } catch(e) {}
+        }
+
+        const local = getLocal('teachers');
+        return local.find(t => (t.activationToken || '').trim().toUpperCase() === cleanToken) || null;
+    },
+
+    async getParentByPhone(phone) {
+        if (!phone) return null;
+        const clean = (p) => (p || '').replace(/[^0-9]/g, '');
+        const target = clean(phone);
+        if (!target) return null;
+
+        if (isSupabaseConfigured()) {
+            try {
+                const { data } = await withTimeout(
+                    supabase.from(TABLES.PARENTS).select('*')
+                );
+                if (data && data.length > 0) {
+                    const matched = data.find(p => clean(p.parent_phone) === target);
+                    if (matched) return mapParentRow(matched);
+                }
+            } catch(e) {}
+        }
+
+        const local = getLocal('parents');
+        return local.find(p => clean(p.parentPhone) === target) || null;
+    },
+
+    async getParentByToken(token) {
+        if (!token) return null;
+        const cleanToken = token.trim().toUpperCase();
+
+        if (isSupabaseConfigured()) {
+            try {
+                const { data } = await withTimeout(
+                    supabase.from(TABLES.PARENTS).select('*').ilike('activation_token', cleanToken).limit(1)
+                );
+                if (data && data.length > 0) {
+                    return mapParentRow(data[0]);
+                }
+            } catch(e) {}
+        }
+
+        const local = getLocal('parents');
+        return local.find(p => (p.activationToken || '').trim().toUpperCase() === cleanToken) || null;
+    },
+
+    async findAccountByToken(token) {
+        if (!token) return null;
+        const cleanToken = token.trim().toUpperCase();
+
+        const teacher = await this.getTeacherByToken(cleanToken);
+        if (teacher) return { role: 'Teacher', user: teacher };
+
+        const parent = await this.getParentByToken(cleanToken);
+        if (parent) return { role: 'Parent', user: parent };
+
+        return null;
+    },
+
     // =========================================================================
     // 7. ACTIVATION ENGINE (TEACHER & PARENT QR)
     // =========================================================================
     async activateAccountWithToken(token, newPassword) {
-        const cleanToken = (token || '').trim().toUpperCase();
+        let cleanToken = (token || '').trim();
         
-        const teachers = await this.getTeachers();
-        const teacher = teachers.find(t => (t.activationToken || '').toUpperCase() === cleanToken);
+        // Strip URL parameters if pasted as URL
+        if (cleanToken.includes('activate=')) {
+            const m = cleanToken.match(/[?&]activate=([^&#]+)/);
+            if (m) cleanToken = decodeURIComponent(m[1]);
+        }
+        cleanToken = cleanToken.trim().toUpperCase();
+
+        if (!cleanToken) {
+            throw new Error("Please enter a valid activation code.");
+        }
+
+        const timeStr = new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        // 1. Check Teachers
+        const teacher = await this.getTeacherByToken(cleanToken);
         if (teacher) {
+            if (teacher.isSuspended) {
+                throw new Error("⛔ Account Suspended: Your teacher account has been suspended by administration.");
+            }
             await this.updateTeacher(teacher.$id || teacher.id, {
                 isActivated: true,
                 password: newPassword,
                 hasLoggedIn: true,
-                lastLogin: new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                lastLogin: timeStr
             });
+            teacher.isActivated = true;
+            teacher.password = newPassword;
+            teacher.hasLoggedIn = true;
+            teacher.lastLogin = timeStr;
             return { role: 'Teacher', user: teacher };
         }
 
-        const parents = await this.getParents();
-        const parent = parents.find(p => (p.activationToken || '').toUpperCase() === cleanToken);
+        // 2. Check Parents
+        const parent = await this.getParentByToken(cleanToken);
         if (parent) {
+            if (parent.isSuspended) {
+                throw new Error("⛔ Access Denied: Your parent account has been suspended by administration.");
+            }
             await this.updateParent(parent.$id || parent.id, {
                 isActivated: true,
                 pin: newPassword,
                 hasLoggedIn: true,
-                lastLogin: new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                lastLogin: timeStr
             });
+            parent.isActivated = true;
+            parent.pin = newPassword;
+            parent.hasLoggedIn = true;
+            parent.lastLogin = timeStr;
             return { role: 'Parent', user: parent };
         }
 
-        throw new Error("Invalid or expired Activation QR Token. Please contact your school administrator.");
+        throw new Error("Invalid or expired activation QR token. Please verify the code or contact your school administrator.");
     },
 
     // =========================================================================

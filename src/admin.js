@@ -1261,7 +1261,16 @@ export async function renderTeachersManagement() {
             <div class="glass modal-box" style="width: 100%; max-width: 440px; padding: 28px; text-align: center; position: relative;">
                 <button id="close-onboarding-qr-modal" class="icon-btn" style="position: absolute; right: 15px; top: 15px;">✖</button>
                 <h3 id="onboarding-qr-title">Onboarding QR Code</h3>
+                <p style="color: var(--text-secondary); font-size: 13px; margin-top: 4px;">Scan with mobile camera or use the direct link below</p>
                 <div id="onboarding-qrcode-target" style="background: white; padding: 16px; border-radius: 12px; display: inline-block; margin-top: 14px;"></div>
+                <div style="margin-top: 14px;">
+                    <div style="font-size: 12px; color: var(--text-secondary);">Activation Token:</div>
+                    <code id="onboarding-token-display" style="display: inline-block; margin-top: 4px; padding: 6px 14px; background: rgba(99, 102, 241, 0.2); color: #818cf8; border-radius: 6px; font-size: 14px; font-weight: 700;"></code>
+                </div>
+                <div style="display: flex; gap: 8px; justify-content: center; margin-top: 16px; flex-wrap: wrap;">
+                    <button id="btn-copy-teacher-link" class="btn small primary">📋 Copy Link</button>
+                    <a id="btn-open-teacher-link" href="#" target="_blank" class="btn small secondary" style="text-decoration: none;">🌐 Open Link</a>
+                </div>
             </div>
         </div>
     `;
@@ -1330,19 +1339,34 @@ export async function renderTeachersManagement() {
         });
     });
 
+    let currentTeacherTargetUrl = '';
     document.querySelectorAll('.view-teacher-onboarding-qr').forEach(btn => {
         btn.addEventListener('click', () => {
             const token = btn.dataset.token;
             const name = btn.dataset.name;
-            const targetUrl = `${window.location.origin}${window.location.pathname}?activate=${token}&role=Teacher`;
+            currentTeacherTargetUrl = `${window.location.origin}${window.location.pathname}?activate=${token}&role=Teacher`;
 
             document.getElementById('onboarding-qr-title').textContent = `${name} - Activation QR`;
+            document.getElementById('onboarding-token-display').textContent = token;
+            const openLinkBtn = document.getElementById('btn-open-teacher-link');
+            if (openLinkBtn) openLinkBtn.href = currentTeacherTargetUrl;
+
             const qrTarget = document.getElementById('onboarding-qrcode-target');
             qrTarget.innerHTML = '';
             
-            new QRCode(qrTarget, { text: targetUrl, width: 200, height: 200 });
+            new QRCode(qrTarget, { text: currentTeacherTargetUrl, width: 200, height: 200 });
             document.getElementById('onboarding-qr-modal').classList.remove('hidden');
         });
+    });
+
+    document.getElementById('btn-copy-teacher-link').addEventListener('click', () => {
+        if (currentTeacherTargetUrl) {
+            navigator.clipboard.writeText(currentTeacherTargetUrl).then(() => {
+                alert('Teacher activation link copied to clipboard!');
+            }).catch(() => {
+                prompt('Copy activation URL:', currentTeacherTargetUrl);
+            });
+        }
     });
 
     document.getElementById('close-onboarding-qr-modal').addEventListener('click', () => {
@@ -1456,7 +1480,16 @@ export async function renderParentsManagement() {
             <div class="glass modal-box" style="width: 100%; max-width: 440px; padding: 28px; text-align: center; position: relative;">
                 <button id="close-parent-onboard-modal" class="icon-btn" style="position: absolute; right: 15px; top: 15px;">✖</button>
                 <h3 id="parent-onboard-title">Parent Activation QR</h3>
+                <p style="color: var(--text-secondary); font-size: 13px; margin-top: 4px;">Scan with mobile camera or use the direct link below</p>
                 <div id="parent-onboard-target" style="background: white; padding: 16px; border-radius: 12px; display: inline-block; margin-top: 14px;"></div>
+                <div style="margin-top: 14px;">
+                    <div style="font-size: 12px; color: var(--text-secondary);">Activation Token:</div>
+                    <code id="parent-token-display" style="display: inline-block; margin-top: 4px; padding: 6px 14px; background: rgba(16, 185, 129, 0.2); color: #10b981; border-radius: 6px; font-size: 14px; font-weight: 700;"></code>
+                </div>
+                <div style="display: flex; gap: 8px; justify-content: center; margin-top: 16px; flex-wrap: wrap;">
+                    <button id="btn-copy-parent-link" class="btn small primary">📋 Copy Link</button>
+                    <a id="btn-open-parent-link" href="#" target="_blank" class="btn small secondary" style="text-decoration: none;">🌐 Open Link</a>
+                </div>
             </div>
         </div>
     `;
@@ -1508,19 +1541,34 @@ export async function renderParentsManagement() {
         });
     });
 
+    let currentParentTargetUrl = '';
     document.querySelectorAll('.view-parent-onboarding-qr').forEach(btn => {
         btn.addEventListener('click', () => {
             const token = btn.dataset.token;
             const name = btn.dataset.name;
-            const targetUrl = `${window.location.origin}${window.location.pathname}?activate=${token}&role=Parent`;
+            currentParentTargetUrl = `${window.location.origin}${window.location.pathname}?activate=${token}&role=Parent`;
 
             document.getElementById('parent-onboard-title').textContent = `${name} - Activation QR`;
+            document.getElementById('parent-token-display').textContent = token;
+            const openLinkBtn = document.getElementById('btn-open-parent-link');
+            if (openLinkBtn) openLinkBtn.href = currentParentTargetUrl;
+
             const qrTarget = document.getElementById('parent-onboard-target');
             qrTarget.innerHTML = '';
             
-            new QRCode(qrTarget, { text: targetUrl, width: 200, height: 200 });
+            new QRCode(qrTarget, { text: currentParentTargetUrl, width: 200, height: 200 });
             document.getElementById('parent-onboard-qr-modal').classList.remove('hidden');
         });
+    });
+
+    document.getElementById('btn-copy-parent-link').addEventListener('click', () => {
+        if (currentParentTargetUrl) {
+            navigator.clipboard.writeText(currentParentTargetUrl).then(() => {
+                alert('Parent activation link copied to clipboard!');
+            }).catch(() => {
+                prompt('Copy activation URL:', currentParentTargetUrl);
+            });
+        }
     });
 
     document.getElementById('close-parent-onboard-modal').addEventListener('click', () => {
